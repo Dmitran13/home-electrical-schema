@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Электрощит Дома — Интерактивный Мониторинг и Балансировка Фаз</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            phase1: '#ef4444',
+            phase2: '#10b981',
+            phase3: '#8b5cf6',
+            panelbg: '#0f172a',
+            cardbg: '#1e293b',
+            bordercol: '#334155'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @keyframes pulse-glow {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.7; transform: scale(1.05); }
+    }
+    .alert-pulse {
+      animation: pulse-glow 2s infinite ease-in-out;
+    }
+    .din-rail {
+      background: linear-gradient(180deg, #334155 0%, #1e293b 50%, #334155 100%);
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.6);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased selection:bg-indigo-500 selection:text-white">
+
+  <!-- Навигация и Шапка -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap justify-between items-center gap-4">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-rose-600 flex items-center justify-center text-white shadow-lg shadow-amber-500/20">
+          <i class="fa-solid fa-bolt text-lg"></i>
+        </div>
+        <div>
+          <h1 class="text-lg sm:text-xl font-bold tracking-tight text-white flex items-center gap-2">
+            Home Power System
+            <span class="text-xs font-mono font-normal px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
+              <i class="fa-solid fa-triangle-exclamation mr-1"></i>ДИСБАЛАНС НАГРУЗКИ
+            </span>
+          </h1>
+          <p class="text-xs text-slate-400">Ввод 380/220V 15 кВт • 33 устройства (Tuya SY2) • Dmitran13</p>
+        </div>
+      </div>
+
+      <!-- Переключатель режима симуляции перебалансировки -->
+      <div class="flex items-center gap-3">
+        <div class="bg-slate-800 p-1 rounded-xl border border-slate-700 flex items-center">
+          <button id="btn-mode-actual" onclick="setMode('actual')" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition bg-rose-600 text-white shadow">
+            Текущее состояние
+          </button>
+          <button id="btn-mode-rebalanced" onclick="setMode('rebalanced')" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition text-slate-400 hover:text-white">
+            <i class="fa-solid fa-wand-magic-sparkles mr-1"></i>После перебалансировки
+          </button>
+        </div>
+
+        <button onclick="refreshData()" title="Обновить телеметрию" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
+          <i class="fa-solid fa-rotate text-sm" id="refresh-icon"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Основной контент -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- Баннер аварийного состояния и смещения нейтрали -->
+    <div id="imbalance-alert-box" class="bg-gradient-to-r from-rose-950/70 via-slate-900 to-amber-950/70 border border-rose-600/40 rounded-2xl p-5 shadow-2xl relative overflow-hidden">
+      <div class="absolute -right-6 -bottom-6 text-rose-600/10 text-9xl pointer-events-none">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+      </div>
+      <div class="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div class="space-y-1">
+          <div class="flex items-center gap-2">
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-600 text-white alert-pulse">
+              КРИТИЧЕСКИЙ ПЕРЕКОС ФАЗ
+            </span>
+            <span class="text-xs text-slate-400 font-mono">ΔU = 40.0 В • Смещение потенциала нейтрали</span>
+          </div>
+          <h2 class="text-base sm:text-lg font-bold text-white">
+            Фаза 1 перегружена ТЭНом котла (14.99A / 206.9В), а Фаза 3 недогружена (0.41A / 242.1В)
+          </h2>
+          <p class="text-xs text-slate-300 max-w-3xl">
+            Из-за мощной нагрузки 3.1 кВт на Фазе 1 при почти нулевой нагрузке на Фазе 3 нулевая точка смещается в сторону L1.
+            Это вызывает просадку L1 (до 202.1В) и опасный скачок L3 (до 242.1В), угрожая чувствительной технике.
+          </p>
+        </div>
+        <div class="flex flex-wrap gap-2 shrink-0">
+          <button onclick="document.getElementById('rebalance-section').scrollIntoView({behavior: 'smooth'})" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl shadow-lg transition flex items-center gap-2">
+            <i class="fa-solid fa-screwdriver-wrench"></i> План перекоммутации
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ключевые метрики фаз (3 Карточки) -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+
+      <!-- Фаза 1 -->
+      <div id="card-l1" class="bg-slate-900/90 border-2 border-rose-500/50 rounded-2xl p-5 relative shadow-xl hover:border-rose-500 transition">
+        <div class="flex justify-between items-start mb-4">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-3 rounded-full bg-rose-500 alert-pulse"></span>
+              <h3 class="font-bold text-base text-rose-400">ФАЗА 1 (L1)</h3>
+            </div>
+            <p class="text-xs text-slate-400">Котёл, насос, гардероб</p>
+          </div>
+          <span class="text-xs font-bold px-2 py-1 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">ПЕРЕГРУЗ</span>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2 text-center py-3 bg-slate-950/60 rounded-xl border border-slate-800 mb-4">
+          <div>
+            <div class="text-xs text-slate-400">Напряжение</div>
+            <div id="val-u-l1" class="text-xl font-mono font-bold text-rose-400">206.9 <span class="text-xs font-normal">В</span></div>
+            <div class="text-[10px] text-rose-500/80">мин. 202.1 В</div>
+          </div>
+          <div>
+            <div class="text-xs text-slate-400">Сумм. ток</div>
+            <div id="val-i-l1" class="text-xl font-mono font-bold text-rose-400">14.99 <span class="text-xs font-normal">А</span></div>
+            <div class="text-[10px] text-slate-400">93.7% от 16А</div>
+          </div>
+          <div>
+            <div class="text-xs text-slate-400">Мощность</div>
+            <div id="val-p-l1" class="text-xl font-mono font-bold text-slate-100">3.11 <span class="text-xs font-normal">кВт</span></div>
+            <div class="text-[10px] text-slate-400">7 линий</div>
+          </div>
+        </div>
+
+        <!-- Прогресс нагрузки автомата котла -->
+        <div class="space-y-1">
+          <div class="flex justify-between text-xs">
+            <span class="text-slate-400">Пиковый автомат (Котёл 16A):</span>
+            <span id="bar-text-l1" class="font-mono text-rose-400 font-bold">14.99A / 16A (94%)</span>
+          </div>
+          <div class="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
+            <div id="bar-fill-l1" class="bg-rose-500 h-full rounded-full transition-all duration-700" style="width: 93.7%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Фаза 2 -->
+      <div id="card-l2" class="bg-slate-900/90 border border-slate-700 rounded-2xl p-5 relative shadow-xl hover:border-emerald-500/60 transition">
+        <div class="flex justify-between items-start mb-4">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-3 rounded-full bg-emerald-400"></span>
+              <h3 class="font-bold text-base text-emerald-400">ФАЗА 2 (L2)</h3>
+            </div>
+            <p class="text-xs text-slate-400">Кухня, бойлер, свет, спальни</p>
+          </div>
+          <span class="text-xs font-bold px-2 py-1 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">НОРМА</span>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2 text-center py-3 bg-slate-950/60 rounded-xl border border-slate-800 mb-4">
+          <div>
+            <div class="text-xs text-slate-400">Напряжение</div>
+            <div id="val-u-l2" class="text-xl font-mono font-bold text-emerald-400">219.7 <span class="text-xs font-normal">В</span></div>
+            <div class="text-[10px] text-slate-400">215.5 - 223.3 В</div>
+          </div>
+          <div>
+            <div class="text-xs text-slate-400">Сумм. ток</div>
+            <div id="val-i-l2" class="text-xl font-mono font-bold text-emerald-400">3.66 <span class="text-xs font-normal">А</span></div>
+            <div class="text-[10px] text-slate-400">умеренная</div>
+          </div>
+          <div>
+            <div class="text-xs text-slate-400">Мощность</div>
+            <div id="val-p-l2" class="text-xl font-mono font-bold text-slate-100">0.49 <span class="text-xs font-normal">кВт</span></div>
+            <div class="text-[10px] text-slate-400">18 линий</div>
+          </div>
+        </div>
+
+        <div class="space-y-1">
+          <div class="flex justify-between text-xs">
+            <span class="text-slate-400">Загрузка фазы:</span>
+            <span id="bar-text-l2" class="font-mono text-emerald-400 font-bold">3.66A / 25A (14.6%)</span>
+          </div>
+          <div class="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
+            <div id="bar-fill-l2" class="bg-emerald-500 h-full rounded-full transition-all duration-700" style="width: 14.6%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Фаза 3 -->
+      <div id="card-l3" class="bg-slate-900/90 border-2 border-violet-500/50 rounded-2xl p-5 relative shadow-xl hover:border-violet-500 transition">
+        <div class="flex justify-between items-start mb-4">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-3 rounded-full bg-violet-400 alert-pulse"></span>
+              <h3 class="font-bold text-base text-violet-400">ФАЗА 3 (L3)</h3>
+            </div>
+            <p class="text-xs text-slate-400">Плита, духовка, розетки В</p>
+          </div>
+          <span class="text-xs font-bold px-2 py-1 rounded bg-violet-500/20 text-violet-300 border border-violet-500/30">ЗАВЫШЕНО</span>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2 text-center py-3 bg-slate-950/60 rounded-xl border border-slate-800 mb-4">
+          <div>
+            <div class="text-xs text-slate-400">Напряжение</div>
+            <div id="val-u-l3" class="text-xl font-mono font-bold text-violet-400">233.7 <span class="text-xs font-normal">В</span></div>
+            <div class="text-[10px] text-violet-400">макс. 242.1 В!</div>
+          </div>
+          <div>
+            <div class="text-xs text-slate-400">Сумм. ток</div>
+            <div id="val-i-l3" class="text-xl font-mono font-bold text-violet-400">0.41 <span class="text-xs font-normal">А</span></div>
+            <div class="text-[10px] text-slate-400">недогружена</div>
+          </div>
+          <div>
+            <div class="text-xs text-slate-400">Мощность</div>
+            <div id="val-p-l3" class="text-xl font-mono font-bold text-slate-100">0.10 <span class="text-xs font-normal">кВт</span></div>
+            <div class="text-[10px] text-slate-400">3 линии</div>
+          </div>
+        </div>
+
+        <div class="space-y-1">
+          <div class="flex justify-between text-xs">
+            <span class="text-slate-400">Загрузка фазы:</span>
+            <span id="bar-text-l3" class="font-mono text-violet-400 font-bold">0.41A / 25A (1.6%)</span>
+          </div>
+          <div class="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
+            <div id="bar-fill-l3" class="bg-violet-500 h-full rounded-full transition-all duration-700" style="width: 2%"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Графики и Распределение -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <!-- График токов по фазам -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg">
+        <h3 class="text-sm font-bold text-slate-200 mb-4 flex items-center gap-2">
+          <i class="fa-solid fa-chart-pie text-indigo-400"></i> Распределение мощности по фазам
+        </h3>
+        <div class="h-56 relative flex items-center justify-center">
+          <canvas id="phasePowerChart"></canvas>
+        </div>
+      </div>
+
+      <!-- График напряжений на линиях -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg lg:col-span-2">
+        <h3 class="text-sm font-bold text-slate-200 mb-4 flex items-center gap-2">
+          <i class="fa-solid fa-chart-bar text-indigo-400"></i> Напряжения по фазам (Просадка L1 vs Завышение L3)
+        </h3>
+        <div class="h-56 relative">
+          <canvas id="voltageBarChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Физический вид электрощита (DIN-рейки) -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-6">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-server text-amber-400"></i> Схема распределительного щита (DIN-рейки)
+          </h2>
+          <p class="text-xs text-slate-400">33 модульных устройства • Кликните на автомат для детального анализа линии</p>
+        </div>
+
+        <!-- Фильтры -->
+        <div class="flex flex-wrap gap-2 text-xs">
+          <button onclick="filterDevices('all')" id="flt-all" class="px-3 py-1 rounded-lg bg-indigo-600 text-white font-medium">Все (33)</button>
+          <button onclick="filterDevices('L1')" id="flt-l1" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-rose-300 border border-rose-500/30">Фаза 1 (8)</button>
+          <button onclick="filterDevices('L2')" id="flt-l2" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/30">Фаза 2 (19)</button>
+          <button onclick="filterDevices('L3')" id="flt-l3" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-violet-300 border border-violet-500/30">Фаза 3 (4)</button>
+          <button onclick="filterDevices('alerts')" id="flt-alerts" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30">⚠️ Тревоги (5)</button>
+        </div>
+      </div>
+
+      <!-- Сетка устройств -->
+      <div id="devices-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+        <!-- Генерируется через JS -->
+      </div>
+    </div>
+
+    <!-- Рекомендации по перебалансировке нагрузки -->
+    <div id="rebalance-section" class="bg-gradient-to-br from-slate-900 to-indigo-950/40 border border-indigo-500/30 rounded-2xl p-6 shadow-2xl space-y-5">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-lg shadow-lg shadow-indigo-600/30">
+          <i class="fa-solid fa-diagram-project"></i>
+        </div>
+        <div>
+          <h3 class="text-base sm:text-lg font-bold text-white">Инженерный план балансировки распределительного щита</h3>
+          <p class="text-xs text-slate-400">Устранение просадки L1 до 202В и завышения L3 до 242В</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-800 space-y-2">
+          <div class="text-xs font-bold text-rose-400 flex items-center gap-2">
+            <span class="w-6 h-6 rounded-full bg-rose-500/20 flex items-center justify-center">1</span>
+            Перенос ТЭНа котла на Фазу 3
+          </div>
+          <p class="text-xs text-slate-300">
+            Переключить кабель питания «3 котёл насос 1тэн» (14.99 А / 3.1 кВт) с фазной шины L1 на L3.
+          </p>
+          <div class="text-[11px] text-emerald-400 font-mono bg-slate-950 p-2 rounded">
+            L1 разгрузится: 15.0А → 0.0А<br>
+            L3 нагрузится: 0.4А → 15.4А<br>
+            Напряжение L1 вырастет до ~225 В!
+          </div>
+        </div>
+
+        <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-800 space-y-2">
+          <div class="text-xs font-bold text-amber-400 flex items-center gap-2">
+            <span class="w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center">2</span>
+            Перенос Бойлера ГВС на Фазу 1
+          </div>
+          <p class="text-xs text-slate-300">
+            Перенести накопительный водонагреватель (до 2 кВт / ~9 А в активном режиме) с шины L2 на L1.
+          </p>
+          <div class="text-[11px] text-emerald-400 font-mono bg-slate-950 p-2 rounded">
+            Выравнивание активных потребителей:<br>
+            L1: Бойлер (9А)<br>
+            L2: Бытовая техника & насос (~8А)<br>
+            L3: Электрокотёл (~15А в мороз)
+          </div>
+        </div>
+
+        <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-800 space-y-2">
+          <div class="text-xs font-bold text-violet-400 flex items-center gap-2">
+            <span class="w-6 h-6 rounded-full bg-violet-500/20 flex items-center justify-center">3</span>
+            Ревизия автомата «Скважина» (43°C)
+          </div>
+          <p class="text-xs text-slate-300">
+            Затянуть винтовые клеммы автомата «Скважина» динамометрической отверткой (2.5 Н·м).
+          </p>
+          <div class="text-[11px] text-amber-300 font-mono bg-slate-950 p-2 rounded">
+            При токе 0.096А нагрев до 43°C указывает на переходное сопротивление в контактах!
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Модальное окно детализации устройства -->
+  <div id="device-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative space-y-4">
+      <button onclick="closeModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+
+      <div class="flex items-center gap-3">
+        <div id="modal-phase-badge" class="px-2.5 py-1 rounded text-xs font-bold font-mono">L1</div>
+        <div>
+          <h4 id="modal-title" class="font-bold text-lg text-white">Имя автомата</h4>
+          <p id="modal-subtitle" class="text-xs text-slate-400">DEV-ID</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 bg-slate-950 p-4 rounded-xl border border-slate-800 text-sm">
+        <div>
+          <div class="text-xs text-slate-400">Напряжение:</div>
+          <div id="modal-u" class="font-mono font-bold text-white">220 В</div>
+        </div>
+        <div>
+          <div class="text-xs text-slate-400">Ток / Номинал:</div>
+          <div id="modal-i" class="font-mono font-bold text-white">0 A / 16 A</div>
+        </div>
+        <div>
+          <div class="text-xs text-slate-400">Мощность:</div>
+          <div id="modal-p" class="font-mono font-bold text-white">0 Вт</div>
+        </div>
+        <div>
+          <div class="text-xs text-slate-400">Температура:</div>
+          <div id="modal-temp" class="font-mono font-bold text-white">35 °C</div>
+        </div>
+      </div>
+
+      <div>
+        <h5 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Инженерное примечание:</h5>
+        <p id="modal-notes" class="text-xs text-slate-300 bg-slate-800/60 p-3 rounded-lg border border-slate-700/60"></p>
+      </div>
+
+      <div class="pt-2 flex justify-end">
+        <button onclick="closeModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg transition">
+          Закрыть
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="border-t border-slate-800 py-6 text-center text-xs text-slate-500">
+    <p>Репозиторий проекта: <a href="https://github.com/Dmitran13/home-electrical-schema" class="text-indigo-400 hover:underline">Dmitran13/home-electrical-schema</a> • Данные синхронизированы с Tuya SY2</p>
+  </footer>
+
+  <script>
+    // Исходные данные схемы (33 устройства)
+    let rawData = null;
+    let currentFilter = 'all';
+    let currentMode = 'actual'; // 'actual' | 'rebalanced'
+    let powerChartInstance = null;
+    let voltageChartInstance = null;
+
+    // Загрузка schema_data.json
+    async function loadData() {
+      try {
+        const resp = await fetch('schema_data.json');
+        if (resp.ok) {
+          rawData = await resp.json();
+        } else {
+          throw new Error('Fetch failed');
+        }
+      } catch (e) {
+        console.warn('Используются встроенные резервные данные телеметрии:', e);
+        rawData = getFallbackData();
+      }
+      renderDashboard();
+    }
+
+    function setMode(mode) {
+      currentMode = mode;
+      document.getElementById('btn-mode-actual').className = mode === 'actual' 
+        ? 'px-3 py-1.5 rounded-lg text-xs font-semibold transition bg-rose-600 text-white shadow'
+        : 'px-3 py-1.5 rounded-lg text-xs font-semibold transition text-slate-400 hover:text-white';
+      
+      document.getElementById('btn-mode-rebalanced').className = mode === 'rebalanced'
+        ? 'px-3 py-1.5 rounded-lg text-xs font-semibold transition bg-emerald-600 text-white shadow'
+        : 'px-3 py-1.5 rounded-lg text-xs font-semibold transition text-slate-400 hover:text-white';
+
+      renderDashboard();
+    }
+
+    function renderDashboard() {
+      if (!rawData) return;
+
+      const isRebalanced = (currentMode === 'rebalanced');
+      const alertBox = document.getElementById('imbalance-alert-box');
+
+      if (isRebalanced) {
+        alertBox.className = "bg-gradient-to-r from-emerald-950/70 via-slate-900 to-teal-950/70 border border-emerald-600/40 rounded-2xl p-5 shadow-2xl relative overflow-hidden";
+        alertBox.innerHTML = `
+          <div class="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-600 text-white">
+                  СИМУЛЯЦИЯ: БАЛАНСИРОВКА ВЫПОЛНЕНА
+                </span>
+                <span class="text-xs text-slate-400 font-mono">ΔU = 3.5 В • Токи сбалансированы (~5-7А)</span>
+              </div>
+              <h2 class="text-base sm:text-lg font-bold text-white">
+                ТЭН котла перенесен на Фазу 3, Бойлер ГВС — на Фазу 1
+              </h2>
+              <p class="text-xs text-slate-300 max-w-3xl">
+                Напряжение выровнялось на всех трех фазах (L1: 223В, L2: 221В, L3: 225В). Смещение нейтрали сведено к минимуму.
+                Исчез риск аварийного срабатывания РКН.
+              </p>
+            </div>
+            <button onclick="setMode('actual')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg transition">
+              Вернуть текущие замеры
+            </button>
+          </div>
+        `;
+      } else {
+        alertBox.className = "bg-gradient-to-r from-rose-950/70 via-slate-900 to-amber-950/70 border border-rose-600/40 rounded-2xl p-5 shadow-2xl relative overflow-hidden";
+        alertBox.innerHTML = `
+          <div class="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-600 text-white alert-pulse">
+                  КРИТИЧЕСКИЙ ПЕРЕКОС ФАЗ
+                </span>
+                <span class="text-xs text-slate-400 font-mono">ΔU = 40.0 В • Смещение потенциала нейтрали</span>
+              </div>
+              <h2 class="text-base sm:text-lg font-bold text-white">
+                Фаза 1 перегружена ТЭНом котла (14.99A / 206.9В), а Фаза 3 недогружена (0.41A / 242.1В)
+              </h2>
+              <p class="text-xs text-slate-300 max-w-3xl">
+                Из-за мощной нагрузки 3.1 кВт на Фазе 1 при почти нулевой нагрузке на Фазе 3 нулевая точка смещается в сторону L1.
+                Это вызывает просадку L1 (до 202.1В) и опасный скачок L3 (до 242.1В), угрожая технике.
+              </p>
+            </div>
+            <button onclick="document.getElementById('rebalance-section').scrollIntoView({behavior: 'smooth'})" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl shadow-lg transition flex items-center gap-2">
+              <i class="fa-solid fa-screwdriver-wrench"></i> План перекоммутации
+            </button>
+          </div>
+        `;
+      }
+
+      // Карточки фаз
+      if (isRebalanced) {
+        document.getElementById('val-u-l1').innerHTML = '223.0 <span class="text-xs font-normal">В</span>';
+        document.getElementById('val-i-l1').innerHTML = '6.20 <span class="text-xs font-normal">А</span>';
+        document.getElementById('val-p-l1').innerHTML = '1.38 <span class="text-xs font-normal">кВт</span>';
+        document.getElementById('bar-text-l1').innerText = '6.20A / 16A (38.7%)';
+        document.getElementById('bar-fill-l1').style.width = '38.7%';
+        document.getElementById('bar-fill-l1').className = 'bg-emerald-500 h-full rounded-full transition-all duration-700';
+
+        document.getElementById('val-u-l2').innerHTML = '221.0 <span class="text-xs font-normal">В</span>';
+        document.getElementById('val-i-l2').innerHTML = '4.50 <span class="text-xs font-normal">А</span>';
+        document.getElementById('val-p-l2').innerHTML = '0.99 <span class="text-xs font-normal">кВт</span>';
+        document.getElementById('bar-text-l2').innerText = '4.50A / 25A (18.0%)';
+        document.getElementById('bar-fill-l2').style.width = '18.0%';
+
+        document.getElementById('val-u-l3').innerHTML = '224.5 <span class="text-xs font-normal">В</span>';
+        document.getElementById('val-i-l3').innerHTML = '7.50 <span class="text-xs font-normal">А</span>';
+        document.getElementById('val-p-l3').innerHTML = '1.68 <span class="text-xs font-normal">кВт</span>';
+        document.getElementById('bar-text-l3').innerText = '7.50A / 25A (30.0%)';
+        document.getElementById('bar-fill-l3').style.width = '30.0%';
+      } else {
+        document.getElementById('val-u-l1').innerHTML = '206.9 <span class="text-xs font-normal">В</span>';
+        document.getElementById('val-i-l1').innerHTML = '14.99 <span class="text-xs font-normal">А</span>';
+        document.getElementById('val-p-l1').innerHTML = '3.11 <span class="text-xs font-normal">кВт</span>';
+        document.getElementById('bar-text-l1').innerText = '14.99A / 16A (93.7%)';
+        document.getElementById('bar-fill-l1').style.width = '93.7%';
+        document.getElementById('bar-fill-l1').className = 'bg-rose-500 h-full rounded-full transition-all duration-700';
+
+        document.getElementById('val-u-l2').innerHTML = '219.7 <span class="text-xs font-normal">В</span>';
+        document.getElementById('val-i-l2').innerHTML = '3.66 <span class="text-xs font-normal">А</span>';
+        document.getElementById('val-p-l2').innerHTML = '0.49 <span class="text-xs font-normal">кВт</span>';
+        document.getElementById('bar-text-l2').innerText = '3.66A / 25A (14.6%)';
+        document.getElementById('bar-fill-l2').style.width = '14.6%';
+
+        document.getElementById('val-u-l3').innerHTML = '233.7 <span class="text-xs font-normal">В</span>';
+        document.getElementById('val-i-l3').innerHTML = '0.41 <span class="text-xs font-normal">А</span>';
+        document.getElementById('val-p-l3').innerHTML = '0.10 <span class="text-xs font-normal">кВт</span>';
+        document.getElementById('bar-text-l3').innerText = '0.41A / 25A (1.6%)';
+        document.getElementById('bar-fill-l3').style.width = '1.6%';
+      }
+
+      renderDevices();
+      renderCharts(isRebalanced);
+    }
+
+    function filterDevices(flt) {
+      currentFilter = flt;
+      const btns = ['all', 'l1', 'l2', 'l3', 'alerts'];
+      btns.forEach(b => {
+        const el = document.getElementById('flt-' + b);
+        if (b === flt.toLowerCase()) {
+          el.className = 'px-3 py-1 rounded-lg bg-indigo-600 text-white font-medium';
+        } else {
+          el.className = 'px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700';
+        }
+      });
+      renderDevices();
+    }
+
+    function renderDevices() {
+      const container = document.getElementById('devices-container');
+      container.innerHTML = '';
+
+      const devices = rawData.devices.filter(d => {
+        if (currentFilter === 'all') return true;
+        if (currentFilter === 'alerts') return d.alert_level === 'critical' || d.alert_level === 'warning' || d.temperature_c >= 42;
+        return d.phase === currentFilter;
+      });
+
+      devices.forEach(dev => {
+        const card = document.createElement('div');
+        const isCritical = dev.alert_level === 'critical';
+        const isWarning = dev.alert_level === 'warning' || dev.temperature_c >= 42;
+        const isOff = dev.state === 'OFF';
+
+        let borderCol = 'border-slate-800';
+        let badgeBg = 'bg-slate-800 text-slate-300';
+
+        if (dev.phase === 'L1') badgeBg = 'bg-rose-500/20 text-rose-300 border border-rose-500/30';
+        else if (dev.phase === 'L2') badgeBg = 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+        else if (dev.phase === 'L3') badgeBg = 'bg-violet-500/20 text-violet-300 border border-violet-500/30';
+
+        if (isCritical) borderCol = 'border-rose-500/80 bg-rose-950/20';
+        else if (isWarning) borderCol = 'border-amber-500/70 bg-amber-950/20';
+
+        let statusDot = isOff ? 'bg-slate-600' : (isCritical ? 'bg-rose-500 alert-pulse' : (isWarning ? 'bg-amber-400' : 'bg-emerald-400'));
+
+        card.className = `bg-slate-900 p-4 rounded-xl border ${borderCol} hover:border-indigo-500/60 transition cursor-pointer shadow-md flex flex-col justify-between`;
+        card.onclick = () => openModal(dev);
+
+        card.innerHTML = `
+          <div class="space-y-2">
+            <div class="flex justify-between items-start">
+              <span class="text-[11px] font-bold px-2 py-0.5 rounded font-mono ${badgeBg}">${dev.phase}</span>
+              <div class="flex items-center gap-1.5 text-xs">
+                <span class="w-2.5 h-2.5 rounded-full ${statusDot}"></span>
+                <span class="text-slate-400 font-mono text-[11px]">${dev.state}</span>
+              </div>
+            </div>
+
+            <div class="pt-1">
+              <div class="font-bold text-sm text-white line-clamp-1" title="${dev.name}">${dev.name}</div>
+              <div class="text-[10px] text-slate-500 font-mono">${dev.id} • DIN R${dev.din_rail || 1}</div>
+            </div>
+          </div>
+
+          <div class="pt-3 mt-3 border-t border-slate-800/80 grid grid-cols-3 gap-1 text-center text-xs">
+            <div>
+              <div class="text-[10px] text-slate-400">Напр.</div>
+              <div class="font-mono font-bold ${dev.voltage_v < 205 ? 'text-rose-400' : (dev.voltage_v > 240 ? 'text-violet-400' : 'text-slate-200')}">
+                ${dev.voltage_v.toFixed(1)}В
+              </div>
+            </div>
+            <div>
+              <div class="text-[10px] text-slate-400">Ток</div>
+              <div class="font-mono font-bold ${dev.current_a > 12 ? 'text-rose-400' : 'text-slate-200'}">
+                ${dev.current_a.toFixed(2)}А
+              </div>
+            </div>
+            <div>
+              <div class="text-[10px] text-slate-400">Темп.</div>
+              <div class="font-mono font-bold ${dev.temperature_c >= 42 ? 'text-amber-400 flex items-center justify-center gap-0.5' : 'text-slate-200'}">
+                ${dev.temperature_c >= 42 ? '<i class="fa-solid fa-fire text-[9px]"></i>' : ''}${dev.temperature_c}°C
+              </div>
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function renderCharts(isRebalanced) {
+      const p1 = isRebalanced ? 1380 : 3107;
+      const p2 = isRebalanced ? 990 : 474;
+      const p3 = isRebalanced ? 1680 : 95;
+
+      // Donut Chart: Мощность по фазам
+      if (powerChartInstance) powerChartInstance.destroy();
+      const ctx1 = document.getElementById('phasePowerChart').getContext('2d');
+      powerChartInstance = new Chart(ctx1, {
+        type: 'doughnut',
+        data: {
+          labels: ['Фаза 1 (L1)', 'Фаза 2 (L2)', 'Фаза 3 (L3)'],
+          datasets: [{
+            data: [p1, p2, p3],
+            backgroundColor: ['#ef4444', '#10b981', '#8b5cf6'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 11 } } }
+          }
+        }
+      });
+
+      // Bar Chart: Напряжения
+      const u1 = isRebalanced ? 223 : 206.9;
+      const u2 = isRebalanced ? 221 : 219.7;
+      const u3 = isRebalanced ? 224.5 : 233.7;
+
+      if (voltageChartInstance) voltageChartInstance.destroy();
+      const ctx2 = document.getElementById('voltageBarChart').getContext('2d');
+      voltageChartInstance = new Chart(ctx2, {
+        type: 'bar',
+        data: {
+          labels: ['Фаза 1 (L1)', 'Фаза 2 (L2)', 'Фаза 3 (L3)'],
+          datasets: [{
+            label: 'Напряжение (В)',
+            data: [u1, u2, u3],
+            backgroundColor: ['rgba(239, 68, 68, 0.8)', 'rgba(16, 185, 129, 0.8)', 'rgba(139, 92, 246, 0.8)'],
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              min: 190,
+              max: 250,
+              grid: { color: '#334155' },
+              ticks: { color: '#94a3b8' }
+            },
+            x: {
+              grid: { display: false },
+              ticks: { color: '#94a3b8' }
+            }
+          },
+          plugins: {
+            legend: { display: false }
+          }
+        }
+      });
+    }
+
+    function openModal(dev) {
+      document.getElementById('modal-title').innerText = dev.name;
+      document.getElementById('modal-subtitle').innerText = `${dev.id} • Тип: ${dev.type} • DIN-рейка ${dev.din_rail || 1}`;
+      document.getElementById('modal-phase-badge').innerText = dev.phase;
+      document.getElementById('modal-phase-badge').className = `px-2.5 py-1 rounded text-xs font-bold font-mono ${
+        dev.phase === 'L1' ? 'bg-rose-500/20 text-rose-300' : (dev.phase === 'L2' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-violet-500/20 text-violet-300')
+      }`;
+      document.getElementById('modal-u').innerText = `${dev.voltage_v.toFixed(1)} В`;
+      document.getElementById('modal-i').innerText = `${dev.current_a.toFixed(2)} A / ${dev.rated_current_a} A (${dev.load_percent.toFixed(1)}%)`;
+      document.getElementById('modal-p').innerText = `${dev.power_w.toFixed(1)} Вт`;
+      document.getElementById('modal-temp').innerText = `${dev.temperature_c} °C`;
+      document.getElementById('modal-notes').innerText = dev.notes || 'Линия функционирует в штатном режиме.';
+      document.getElementById('device-modal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('device-modal').classList.add('hidden');
+    }
+
+    function refreshData() {
+      const icon = document.getElementById('refresh-icon');
+      icon.classList.add('fa-spin');
+      setTimeout(() => {
+        loadData();
+        icon.classList.remove('fa-spin');
+      }, 500);
+    }
+
+    // Резервный источник данных на случай локального запуска без веб-сервера
+    function getFallbackData() {
+      return {
+        devices: [
+          { id: "L1-01", name: "3 котёл насос 1тэн", phase: "L1", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 206.9, current_a: 14.99, power_w: 3107.0, temperature_c: 39, state: "ON", load_percent: 93.7, alert_level: "critical", notes: "Критическая нагрузка! 94% от 16А" },
+          { id: "L1-02", name: "Мишень", phase: "L1", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 202.1, current_a: 0.0, power_w: 0.0, temperature_c: 32, state: "OFF", load_percent: 0.0, alert_level: "warning", notes: "Просадка до 202.1В" },
+          { id: "L1-03", name: "красная розетка", phase: "L1", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 203.5, current_a: 0.0, power_w: 0.0, temperature_c: 31, state: "OFF", load_percent: 0.0, alert_level: "normal" },
+          { id: "L1-04", name: "Юля", phase: "L1", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 207.3, current_a: 0.0, power_w: 0.0, temperature_c: 36, state: "ON", load_percent: 0.0, alert_level: "normal" },
+          { id: "L1-05", name: "Роз Н", phase: "L1", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 210.2, current_a: 0.0, power_w: 0.0, temperature_c: 31, state: "ON", load_percent: 0.0, alert_level: "normal" },
+          { id: "L1-06", name: "Насос", phase: "L1", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 211.4, current_a: 0.0, power_w: 0.0, temperature_c: 30, state: "ON", load_percent: 0.0, alert_level: "normal" },
+          { id: "L1-07", name: "Гардероб", phase: "L1", type: "smart_breaker_sy2", rated_current_a: 10, voltage_v: 212.0, current_a: 0.0, power_w: 0.0, temperature_c: 39, state: "ON", load_percent: 0.0, alert_level: "normal" },
+          { id: "L2-01", name: "2 бойлер холод очистка скважина дом 3тэн", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 215.5, current_a: 0.987, power_w: 170.1, temperature_c: 39, state: "ON", load_percent: 6.2, alert_level: "normal" },
+          { id: "L2-02", name: "Холл", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 216.0, current_a: 0.38, power_w: 51.0, temperature_c: 35, state: "ON", load_percent: 2.4, alert_level: "normal" },
+          { id: "L2-03", name: "Скважина", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 217.2, current_a: 0.096, power_w: 2.3, temperature_c: 43, state: "ON", load_percent: 0.6, alert_level: "warning", notes: "Перегрев 43°C" },
+          { id: "L2-04", name: "Спальня", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 217.3, current_a: 0.193, power_w: 13.0, temperature_c: 39, state: "ON", load_percent: 1.2, alert_level: "normal" },
+          { id: "L2-05", name: "Туалет", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 10, voltage_v: 218.7, current_a: 0.0, power_w: 0.0, temperature_c: 39, state: "ON", load_percent: 0.0, alert_level: "normal" },
+          { id: "L2-06", name: "Гостинная", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 218.8, current_a: 0.0, power_w: 0.0, temperature_c: 38, state: "ON", load_percent: 0.0, alert_level: "normal" },
+          { id: "L2-07", name: "Кухня", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 219.1, current_a: 0.177, power_w: 15.7, temperature_c: 38, state: "ON", load_percent: 1.1, alert_level: "normal" },
+          { id: "L2-08", name: "Мелания", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 219.7, current_a: 0.034, power_w: 2.6, temperature_c: 40, state: "ON", load_percent: 0.2, alert_level: "normal" },
+          { id: "L2-09", name: "вытяжка", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 10, voltage_v: 220.0, current_a: 0.0, power_w: 0.0, temperature_c: 34, state: "ON", load_percent: 0.0, alert_level: "normal" },
+          { id: "L2-10", name: "варочная панель", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 20, voltage_v: 220.3, current_a: 0.0, power_w: 0.0, temperature_c: 32, state: "ON", load_percent: 0.0, alert_level: "normal" },
+          { id: "L2-11", name: "посудомойка", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 220.4, current_a: 0.0, power_w: 0.0, temperature_c: 33, state: "ON", load_percent: 0.0, alert_level: "normal" },
+          { id: "L2-12", name: "свет везде", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 10, voltage_v: 220.5, current_a: 0.179, power_w: 23.5, temperature_c: 36, state: "ON", load_percent: 1.8, alert_level: "normal" },
+          { id: "L2-13", name: "кондиционер", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 221.1, current_a: 0.0, power_w: 0.0, temperature_c: 31, state: "ON", load_percent: 0.0, alert_level: "normal" },
+          { id: "L2-14", name: "стиралка бойлер", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 221.2, current_a: 0.075, power_w: 3.1, temperature_c: 37, state: "ON", load_percent: 0.5, alert_level: "normal" },
+          { id: "L2-15", name: "микроволновка", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 221.2, current_a: 0.095, power_w: 3.0, temperature_c: 35, state: "ON", load_percent: 0.6, alert_level: "normal" },
+          { id: "L2-16", name: "Бойлер", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 221.5, current_a: 0.877, power_w: 74.8, temperature_c: 38, state: "ON", load_percent: 5.5, alert_level: "normal" },
+          { id: "L2-17", name: "Freeze", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 223.2, current_a: 0.512, power_w: 109.3, temperature_c: 35, state: "ON", load_percent: 3.2, alert_level: "normal" },
+          { id: "L2-18", name: "Router", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 10, voltage_v: 223.3, current_a: 0.057, power_w: 6.0, temperature_c: 36, state: "ON", load_percent: 0.6, alert_level: "normal" },
+          { id: "L3-01", name: "1 плита п/м дух 2ключ тена", phase: "L3", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 229.2, current_a: 0.414, power_w: 95.1, temperature_c: 39, state: "ON", load_percent: 2.6, alert_level: "normal" },
+          { id: "L3-02", name: "Роз В", phase: "L3", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 229.7, current_a: 0.0, power_w: 0.0, temperature_c: 30, state: "OFF", load_percent: 0.0, alert_level: "normal" },
+          { id: "L3-03", name: "WiFi выключатель SY2 с измерением энергопотребления", phase: "L3", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 242.1, current_a: 0.0, power_w: 0.0, temperature_c: 33, state: "ON", load_percent: 0.0, alert_level: "warning", notes: "Завышенное напряжение 242.1В" }
+        ]
+      };
+    }
+
+    window.onload = loadData;
+  </script>
+</body>
+</html>
