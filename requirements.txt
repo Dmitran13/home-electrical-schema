@@ -1,0 +1,4 @@
+# Зависимости для работы с Tuya Cloud и локальной синхронизации
+tuya-connector-python>=0.1.1
+tinytuya>=1.15.0
+requests>=2.31.0
