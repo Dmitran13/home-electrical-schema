@@ -13,6 +13,16 @@ echo "=== Копируем статику ==="
 ssh "$SERVER" "mkdir -p '$DEPLOY_DIR'"
 rsync -az "$PROJECT_DIR/index.html" "$PROJECT_DIR/schema_data.json" "$PROJECT_DIR/electrical_schema.svg" "$SERVER:$DEPLOY_DIR/"
 
+echo "=== Пароль доступа (basic-auth) ==="
+ssh "$SERVER" "
+  if [ ! -f /etc/nginx/.htpasswd-electro ]; then
+    echo '  ВНИМАНИЕ: /etc/nginx/.htpasswd-electro не найден на сервере — создайте вручную:'
+    echo '  printf \"admin:%s\n\" \"\$(openssl passwd -apr1 \"ПАРОЛЬ\")\" > /etc/nginx/.htpasswd-electro'
+  else
+    echo '  .htpasswd-electro уже есть — не трогаем'
+  fi
+"
+
 echo "=== Обновляем nginx (electro.conf) ==="
 scp "$SCRIPT_DIR/electro.conf" "$SERVER:$NGINX_CONF"
 
