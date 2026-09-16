@@ -445,6 +445,7 @@
       const alertBox = document.getElementById('imbalance-alert-box');
 
       if (isRebalanced) {
+        const spread = rawData.rebalanced_plan.asymmetry.phase_voltage_spread_v.toFixed(1);
         alertBox.className = "bg-gradient-to-r from-emerald-950/70 via-slate-900 to-teal-950/70 border border-emerald-600/40 rounded-2xl p-5 shadow-2xl relative overflow-hidden";
         alertBox.innerHTML = `
           <div class="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -453,7 +454,7 @@
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-600 text-white">
                   СИМУЛЯЦИЯ: БАЛАНСИРОВКА ВЫПОЛНЕНА
                 </span>
-                <span class="text-xs text-slate-400 font-mono">ΔU = 3.5 В • Токи сбалансированы (~5-7А)</span>
+                <span class="text-xs text-slate-400 font-mono">ΔU = ${spread} В • Токи сбалансированы (~5-7А)</span>
               </div>
               <h2 class="text-base sm:text-lg font-bold text-white">
                 ТЭН котла перенесен на Фазу 3, Бойлер ГВС — на Фазу 1
@@ -469,6 +470,7 @@
           </div>
         `;
       } else {
+        const spread = rawData.asymmetry_analysis.phase_voltage_spread_v.toFixed(1);
         alertBox.className = "bg-gradient-to-r from-rose-950/70 via-slate-900 to-amber-950/70 border border-rose-600/40 rounded-2xl p-5 shadow-2xl relative overflow-hidden";
         alertBox.innerHTML = `
           <div class="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -477,7 +479,7 @@
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-600 text-white alert-pulse">
                   КРИТИЧЕСКИЙ ПЕРЕКОС ФАЗ
                 </span>
-                <span class="text-xs text-slate-400 font-mono">ΔU = 40.0 В • Смещение потенциала нейтрали</span>
+                <span class="text-xs text-slate-400 font-mono">ΔU = ${spread} В • Смещение потенциала нейтрали</span>
               </div>
               <h2 class="text-base sm:text-lg font-bold text-white">
                 Фаза 1 перегружена ТЭНом котла (14.99A / 206.9В), а Фаза 3 недогружена (0.41A / 242.1В)
@@ -494,49 +496,37 @@
         `;
       }
 
-      // Карточки фаз
-      if (isRebalanced) {
-        document.getElementById('val-u-l1').innerHTML = '223.0 <span class="text-xs font-normal">В</span>';
-        document.getElementById('val-i-l1').innerHTML = '6.20 <span class="text-xs font-normal">А</span>';
-        document.getElementById('val-p-l1').innerHTML = '1.38 <span class="text-xs font-normal">кВт</span>';
-        document.getElementById('bar-text-l1').innerText = '6.20A / 16A (38.7%)';
-        document.getElementById('bar-fill-l1').style.width = '38.7%';
-        document.getElementById('bar-fill-l1').className = 'bg-emerald-500 h-full rounded-full transition-all duration-700';
-
-        document.getElementById('val-u-l2').innerHTML = '221.0 <span class="text-xs font-normal">В</span>';
-        document.getElementById('val-i-l2').innerHTML = '4.50 <span class="text-xs font-normal">А</span>';
-        document.getElementById('val-p-l2').innerHTML = '0.99 <span class="text-xs font-normal">кВт</span>';
-        document.getElementById('bar-text-l2').innerText = '4.50A / 25A (18.0%)';
-        document.getElementById('bar-fill-l2').style.width = '18.0%';
-
-        document.getElementById('val-u-l3').innerHTML = '224.5 <span class="text-xs font-normal">В</span>';
-        document.getElementById('val-i-l3').innerHTML = '7.50 <span class="text-xs font-normal">А</span>';
-        document.getElementById('val-p-l3').innerHTML = '1.68 <span class="text-xs font-normal">кВт</span>';
-        document.getElementById('bar-text-l3').innerText = '7.50A / 25A (30.0%)';
-        document.getElementById('bar-fill-l3').style.width = '30.0%';
-      } else {
-        document.getElementById('val-u-l1').innerHTML = '206.9 <span class="text-xs font-normal">В</span>';
-        document.getElementById('val-i-l1').innerHTML = '14.99 <span class="text-xs font-normal">А</span>';
-        document.getElementById('val-p-l1').innerHTML = '3.11 <span class="text-xs font-normal">кВт</span>';
-        document.getElementById('bar-text-l1').innerText = '14.99A / 16A (93.7%)';
-        document.getElementById('bar-fill-l1').style.width = '93.7%';
-        document.getElementById('bar-fill-l1').className = 'bg-rose-500 h-full rounded-full transition-all duration-700';
-
-        document.getElementById('val-u-l2').innerHTML = '219.7 <span class="text-xs font-normal">В</span>';
-        document.getElementById('val-i-l2').innerHTML = '3.66 <span class="text-xs font-normal">А</span>';
-        document.getElementById('val-p-l2').innerHTML = '0.49 <span class="text-xs font-normal">кВт</span>';
-        document.getElementById('bar-text-l2').innerText = '3.66A / 25A (14.6%)';
-        document.getElementById('bar-fill-l2').style.width = '14.6%';
-
-        document.getElementById('val-u-l3').innerHTML = '233.7 <span class="text-xs font-normal">В</span>';
-        document.getElementById('val-i-l3').innerHTML = '0.41 <span class="text-xs font-normal">А</span>';
-        document.getElementById('val-p-l3').innerHTML = '0.10 <span class="text-xs font-normal">кВт</span>';
-        document.getElementById('bar-text-l3').innerText = '0.41A / 25A (1.6%)';
-        document.getElementById('bar-fill-l3').style.width = '1.6%';
-      }
+      // Карточки фаз — числа берутся из rawData, а не захардкожены
+      const metricsSource = isRebalanced ? rawData.rebalanced_plan.phase_metrics : rawData.phase_metrics;
+      PHASES.forEach(ph => applyPhaseCard(ph, metricsSource[ph], isRebalanced));
 
       renderDevices();
       renderCharts(isRebalanced);
+    }
+
+    const PHASES = ['L1', 'L2', 'L3'];
+    // Знаменатель загрузки шкалы: L1 — по самому нагруженному автомату (котёл 16А),
+    // L2/L3 — по номиналу вводного автомата фазы (25А).
+    const PHASE_BAR_DENOM = { L1: 16, L2: 25, L3: 25 };
+
+    function applyPhaseCard(phase, m, isRebalanced) {
+      const p = phase.toLowerCase();
+      const u = m.voltage_avg_v.toFixed(1);
+      const i = m.total_current_a.toFixed(2);
+      const kw = (m.total_power_w / 1000).toFixed(2);
+      const denom = PHASE_BAR_DENOM[phase];
+      const pct = (m.total_current_a / denom * 100);
+
+      document.getElementById(`val-u-${p}`).innerHTML = `${u} <span class="text-xs font-normal">В</span>`;
+      document.getElementById(`val-i-${p}`).innerHTML = `${i} <span class="text-xs font-normal">А</span>`;
+      document.getElementById(`val-p-${p}`).innerHTML = `${kw} <span class="text-xs font-normal">кВт</span>`;
+      document.getElementById(`bar-text-${p}`).innerText = `${i}A / ${denom}A (${pct.toFixed(1)}%)`;
+      document.getElementById(`bar-fill-${p}`).style.width = `${pct.toFixed(1)}%`;
+
+      if (phase === 'L1') {
+        document.getElementById('bar-fill-l1').className = 'h-full rounded-full transition-all duration-700 '
+          + (isRebalanced ? 'bg-emerald-500' : 'bg-rose-500');
+      }
     }
 
     function filterDevices(flt) {
@@ -626,9 +616,8 @@
     }
 
     function renderCharts(isRebalanced) {
-      const p1 = isRebalanced ? 1380 : 3107;
-      const p2 = isRebalanced ? 990 : 474;
-      const p3 = isRebalanced ? 1680 : 95;
+      const m = isRebalanced ? rawData.rebalanced_plan.phase_metrics : rawData.phase_metrics;
+      const p1 = m.L1.total_power_w, p2 = m.L2.total_power_w, p3 = m.L3.total_power_w;
 
       // Donut Chart: Мощность по фазам
       if (powerChartInstance) powerChartInstance.destroy();
@@ -653,9 +642,7 @@
       });
 
       // Bar Chart: Напряжения
-      const u1 = isRebalanced ? 223 : 206.9;
-      const u2 = isRebalanced ? 221 : 219.7;
-      const u3 = isRebalanced ? 224.5 : 233.7;
+      const u1 = m.L1.voltage_avg_v, u2 = m.L2.voltage_avg_v, u3 = m.L3.voltage_avg_v;
 
       if (voltageChartInstance) voltageChartInstance.destroy();
       const ctx2 = document.getElementById('voltageBarChart').getContext('2d');
@@ -720,39 +707,18 @@
       }, 500);
     }
 
-    // Резервный источник данных на случай локального запуска без веб-сервера
+    // Резервная заглушка на случай, если schema_data.json недоступен (например, открыт как file://).
+    // Полноценные данные — только в schema_data.json; здесь дублировать 28 устройств незачем.
     function getFallbackData() {
+      const zeroPhase = { voltage_avg_v: 0, total_current_a: 0, total_power_w: 0 };
       return {
-        devices: [
-          { id: "L1-01", name: "3 котёл насос 1тэн", phase: "L1", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 206.9, current_a: 14.99, power_w: 3107.0, temperature_c: 39, state: "ON", load_percent: 93.7, alert_level: "critical", notes: "Критическая нагрузка! 94% от 16А" },
-          { id: "L1-02", name: "Мишень", phase: "L1", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 202.1, current_a: 0.0, power_w: 0.0, temperature_c: 32, state: "OFF", load_percent: 0.0, alert_level: "warning", notes: "Просадка до 202.1В" },
-          { id: "L1-03", name: "красная розетка", phase: "L1", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 203.5, current_a: 0.0, power_w: 0.0, temperature_c: 31, state: "OFF", load_percent: 0.0, alert_level: "normal" },
-          { id: "L1-04", name: "Юля", phase: "L1", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 207.3, current_a: 0.0, power_w: 0.0, temperature_c: 36, state: "ON", load_percent: 0.0, alert_level: "normal" },
-          { id: "L1-05", name: "Роз Н", phase: "L1", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 210.2, current_a: 0.0, power_w: 0.0, temperature_c: 31, state: "ON", load_percent: 0.0, alert_level: "normal" },
-          { id: "L1-06", name: "Насос", phase: "L1", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 211.4, current_a: 0.0, power_w: 0.0, temperature_c: 30, state: "ON", load_percent: 0.0, alert_level: "normal" },
-          { id: "L1-07", name: "Гардероб", phase: "L1", type: "smart_breaker_sy2", rated_current_a: 10, voltage_v: 212.0, current_a: 0.0, power_w: 0.0, temperature_c: 39, state: "ON", load_percent: 0.0, alert_level: "normal" },
-          { id: "L2-01", name: "2 бойлер холод очистка скважина дом 3тэн", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 215.5, current_a: 0.987, power_w: 170.1, temperature_c: 39, state: "ON", load_percent: 6.2, alert_level: "normal" },
-          { id: "L2-02", name: "Холл", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 216.0, current_a: 0.38, power_w: 51.0, temperature_c: 35, state: "ON", load_percent: 2.4, alert_level: "normal" },
-          { id: "L2-03", name: "Скважина", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 217.2, current_a: 0.096, power_w: 2.3, temperature_c: 43, state: "ON", load_percent: 0.6, alert_level: "warning", notes: "Перегрев 43°C" },
-          { id: "L2-04", name: "Спальня", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 217.3, current_a: 0.193, power_w: 13.0, temperature_c: 39, state: "ON", load_percent: 1.2, alert_level: "normal" },
-          { id: "L2-05", name: "Туалет", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 10, voltage_v: 218.7, current_a: 0.0, power_w: 0.0, temperature_c: 39, state: "ON", load_percent: 0.0, alert_level: "normal" },
-          { id: "L2-06", name: "Гостинная", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 218.8, current_a: 0.0, power_w: 0.0, temperature_c: 38, state: "ON", load_percent: 0.0, alert_level: "normal" },
-          { id: "L2-07", name: "Кухня", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 219.1, current_a: 0.177, power_w: 15.7, temperature_c: 38, state: "ON", load_percent: 1.1, alert_level: "normal" },
-          { id: "L2-08", name: "Мелания", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 219.7, current_a: 0.034, power_w: 2.6, temperature_c: 40, state: "ON", load_percent: 0.2, alert_level: "normal" },
-          { id: "L2-09", name: "вытяжка", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 10, voltage_v: 220.0, current_a: 0.0, power_w: 0.0, temperature_c: 34, state: "ON", load_percent: 0.0, alert_level: "normal" },
-          { id: "L2-10", name: "варочная панель", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 20, voltage_v: 220.3, current_a: 0.0, power_w: 0.0, temperature_c: 32, state: "ON", load_percent: 0.0, alert_level: "normal" },
-          { id: "L2-11", name: "посудомойка", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 220.4, current_a: 0.0, power_w: 0.0, temperature_c: 33, state: "ON", load_percent: 0.0, alert_level: "normal" },
-          { id: "L2-12", name: "свет везде", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 10, voltage_v: 220.5, current_a: 0.179, power_w: 23.5, temperature_c: 36, state: "ON", load_percent: 1.8, alert_level: "normal" },
-          { id: "L2-13", name: "кондиционер", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 221.1, current_a: 0.0, power_w: 0.0, temperature_c: 31, state: "ON", load_percent: 0.0, alert_level: "normal" },
-          { id: "L2-14", name: "стиралка бойлер", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 221.2, current_a: 0.075, power_w: 3.1, temperature_c: 37, state: "ON", load_percent: 0.5, alert_level: "normal" },
-          { id: "L2-15", name: "микроволновка", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 221.2, current_a: 0.095, power_w: 3.0, temperature_c: 35, state: "ON", load_percent: 0.6, alert_level: "normal" },
-          { id: "L2-16", name: "Бойлер", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 221.5, current_a: 0.877, power_w: 74.8, temperature_c: 38, state: "ON", load_percent: 5.5, alert_level: "normal" },
-          { id: "L2-17", name: "Freeze", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 223.2, current_a: 0.512, power_w: 109.3, temperature_c: 35, state: "ON", load_percent: 3.2, alert_level: "normal" },
-          { id: "L2-18", name: "Router", phase: "L2", type: "smart_breaker_sy2", rated_current_a: 10, voltage_v: 223.3, current_a: 0.057, power_w: 6.0, temperature_c: 36, state: "ON", load_percent: 0.6, alert_level: "normal" },
-          { id: "L3-01", name: "1 плита п/м дух 2ключ тена", phase: "L3", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 229.2, current_a: 0.414, power_w: 95.1, temperature_c: 39, state: "ON", load_percent: 2.6, alert_level: "normal" },
-          { id: "L3-02", name: "Роз В", phase: "L3", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 229.7, current_a: 0.0, power_w: 0.0, temperature_c: 30, state: "OFF", load_percent: 0.0, alert_level: "normal" },
-          { id: "L3-03", name: "WiFi выключатель SY2 с измерением энергопотребления", phase: "L3", type: "smart_breaker_sy2", rated_current_a: 16, voltage_v: 242.1, current_a: 0.0, power_w: 0.0, temperature_c: 33, state: "ON", load_percent: 0.0, alert_level: "warning", notes: "Завышенное напряжение 242.1В" }
-        ]
+        phase_metrics: { L1: { ...zeroPhase }, L2: { ...zeroPhase }, L3: { ...zeroPhase } },
+        asymmetry_analysis: { phase_voltage_spread_v: 0 },
+        rebalanced_plan: {
+          phase_metrics: { L1: { ...zeroPhase }, L2: { ...zeroPhase }, L3: { ...zeroPhase } },
+          asymmetry: { phase_voltage_spread_v: 0 }
+        },
+        devices: []
       };
     }
 

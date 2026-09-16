@@ -56,6 +56,18 @@
     "primary_cause": "Подключение котла мощностью 3.1 кВт на Фазу 1 при почти нулевой нагрузке на Фазе 3.",
     "recommendation": "Перенести ступень электрокотла или бойлер на Фазу 3 для выравнивания токов до ~6-7А на фазу."
   },
+  "rebalanced_plan": {
+    "description": "Целевые показатели после переноса ТЭНа котла на L3 и бойлера ГВС на L1.",
+    "phase_metrics": {
+      "L1": { "voltage_avg_v": 223.0, "total_current_a": 6.20, "total_power_w": 1380.0 },
+      "L2": { "voltage_avg_v": 221.0, "total_current_a": 4.50, "total_power_w": 990.0 },
+      "L3": { "voltage_avg_v": 224.5, "total_current_a": 7.50, "total_power_w": 1680.0 }
+    },
+    "asymmetry": {
+      "neutral_displacement_voltage_v": 1.5,
+      "phase_voltage_spread_v": 3.5
+    }
+  },
   "devices": [
     {
       "id": "DEV-MAIN-01",

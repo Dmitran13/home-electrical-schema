@@ -295,10 +295,10 @@ http://localhost:8080
 - Формирование отчета по балансировке нагрузок.
 
 ### Установка зависимостей:
-Скрипт использует стандартную библиотеку Python 3. При необходимости работы с tinytuya:
-```bash
-pip install -r requirements.txt
-```
+Скрипт использует только стандартную библиотеку Python 3 (запросы к Tuya OpenAPI — через `urllib`), сторонние пакеты не нужны.
+
+### Реальная синхронизация с устройствами:
+Чтобы `--daemon`/обычный запуск действительно тянул показания с Tuya Cloud, а не только читал локальный `schema_data.json`, у нужных устройств в `schema_data.json` должно быть заполнено поле `tuya_device_id` (реальный ID устройства из Tuya IoT Platform). Коды DPS (`switch_1`, `cur_voltage`, ...) настраиваются в `DPS_CODE_MAP` в начале `tuya_monitor.py` — сверьте их с вашими автоматами в Cloud → API Explorer → Device Status.
 
 ### Примеры запуска:
 
@@ -327,7 +327,7 @@ home-electrical-schema/
 ├── schema_data.json        # Структурированная телеметрия 33 устройств и метрики
 ├── tuya_monitor.py         # Монитор сети и синхронизация с Tuya OpenAPI
 ├── electrical_schema.svg   # Векторная однолинейная схема электрощита
-├── requirements.txt        # Python зависимости (опционально)
+├── test_tuya_monitor.py    # Самопроверка анализатора фаз и разбора DPS
 └── LICENSE                 # Лицензия MIT
 ```
 
