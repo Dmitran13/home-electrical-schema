@@ -37,6 +37,16 @@ CURRENT_LOAD_CRIT_PCT = 90.0   # % от номинала автомата
 TEMP_WARN_C = 42.0             # °C
 TEMP_CRIT_C = 50.0             # °C
 
+# Коды DPS автоматов Tuya SY2. Проверьте реальные коды своего устройства
+# в Tuya IoT Platform (Cloud -> API Explorer -> Device Status) и поправьте здесь.
+DPS_CODE_MAP = {
+    "switch": "switch_1",
+    "voltage": "cur_voltage",      # в 0.1 В
+    "current": "cur_current",      # в мА
+    "power": "cur_power",          # в 0.1 Вт
+    "temperature": "temp_current",  # в °C
+}
+
 # Стандартные цвета для терминального вывода
 class Colors:
     RESET = "\033[0m"
@@ -136,6 +146,46 @@ class TuyaCloudClient:
         except Exception as e:
             print(f"[Tuya Device Query Error] {device_id}: {e}", file=sys.stderr)
             return None
+
+
+def apply_dps_to_device(dev: Dict[str, Any], dps: Dict[str, Any]) -> bool:
+    """Обновляет поля устройства из свежих DPS-статусов Tuya. Возвращает True при изменениях."""
+    codes = DPS_CODE_MAP
+    updated = False
+
+    if codes["switch"] in dps:
+        dev["state"] = "ON" if dps[codes["switch"]] else "OFF"
+        updated = True
+    if codes["voltage"] in dps:
+        dev["voltage_v"] = round(dps[codes["voltage"]] / 10.0, 1)
+        updated = True
+    if codes["current"] in dps:
+        dev["current_a"] = round(dps[codes["current"]] / 1000.0, 3)
+        updated = True
+    if codes["power"] in dps:
+        dev["power_w"] = round(dps[codes["power"]] / 10.0, 1)
+        updated = True
+    if codes["temperature"] in dps:
+        dev["temperature_c"] = dps[codes["temperature"]]
+        updated = True
+
+    if updated and dev.get("rated_current_a"):
+        dev["load_percent"] = round(dev.get("current_a", 0.0) / dev["rated_current_a"] * 100, 1)
+
+    return updated
+
+
+def sync_live_devices(client: "TuyaCloudClient", schema: Dict[str, Any]) -> int:
+    """Опрашивает Tuya Cloud по устройствам с заполненным tuya_device_id и мержит статус в schema."""
+    synced = 0
+    for dev in schema.get("devices", []):
+        device_id = dev.get("tuya_device_id")
+        if not device_id:
+            continue
+        dps = client.get_device_status(device_id)
+        if dps and apply_dps_to_device(dev, dps):
+            synced += 1
+    return synced
 
 
 class PhaseAnalyzer:
@@ -356,6 +406,7 @@ def main():
     region = os.environ.get("TUYA_REGION", "eu")
 
     use_live_api = bool(client_id and client_secret and not args.mock)
+    client: Optional[TuyaCloudClient] = None
 
     if not use_live_api:
         if not args.mock:
@@ -367,9 +418,18 @@ def main():
             print(f"{Colors.GREEN}[OK] Авторизация в Tuya Cloud успешна!{Colors.RESET}")
         else:
             print(f"{Colors.RED}[WARN] Не удалось подключиться к Tuya Cloud. Переключение на локальные данные.{Colors.RESET}")
+            client = None
 
     while True:
         schema = load_local_schema(schema_path)
+
+        if client:
+            synced = sync_live_devices(client, schema)
+            if synced:
+                print(f"{Colors.GREEN}[SYNC] Обновлено устройств из Tuya Cloud: {synced}{Colors.RESET}")
+            else:
+                print(f"{Colors.YELLOW}[SYNC] Нет устройств с полем tuya_device_id — используются локальные данные.{Colors.RESET}")
+
         analysis = PhaseAnalyzer.evaluate(schema)
         print_dashboard(analysis)
 
