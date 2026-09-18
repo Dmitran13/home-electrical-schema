@@ -9,9 +9,28 @@ NGINX_CONF="/etc/nginx/electro.conf"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
-echo "=== Копируем статику ==="
+echo "=== Копируем статику и бэкенд кнопки "Обновить" ==="
 ssh "$SERVER" "mkdir -p '$DEPLOY_DIR'"
-rsync -az "$PROJECT_DIR/index.html" "$PROJECT_DIR/schema_data.json" "$PROJECT_DIR/electrical_schema.svg" "$SERVER:$DEPLOY_DIR/"
+rsync -az "$PROJECT_DIR/index.html" "$PROJECT_DIR/schema_data.json" "$PROJECT_DIR/electrical_schema.svg" \
+  "$PROJECT_DIR/refresh_server.py" "$PROJECT_DIR/tuya_monitor.py" "$SERVER:$DEPLOY_DIR/"
+
+echo "=== Ключи Tuya Cloud (.env на сервере) ==="
+ssh "$SERVER" "
+  if [ ! -f '$DEPLOY_DIR/.env' ]; then
+    echo '  ВНИМАНИЕ: $DEPLOY_DIR/.env не найден — создайте вручную на сервере:'
+    echo '  cat > $DEPLOY_DIR/.env <<ENVEOF'
+    echo '  TUYA_API_KEY=...'
+    echo '  TUYA_API_SECRET=...'
+    echo '  TUYA_REGION=eu'
+    echo '  ENVEOF'
+  else
+    echo '  .env уже есть — не трогаем'
+  fi
+"
+
+echo "=== systemd-сервис бэкенда (electro-refresh) ==="
+scp "$SCRIPT_DIR/electro-refresh.service" "$SERVER:/etc/systemd/system/electro-refresh.service"
+ssh "$SERVER" "systemctl daemon-reload && systemctl enable --now electro-refresh"
 
 echo "=== Пароль доступа (basic-auth) ==="
 ssh "$SERVER" "

@@ -1,7 +1,7 @@
 {
   "project": "Home Electrical Power Distribution & Monitoring",
   "version": "1.2.0",
-  "updated_at": "2026-09-14T14:15:00Z",
+  "updated_at": "2026-09-18T06:39:12Z",
   "grid_specifications": {
     "system_type": "3-Phase TN-C-S / TN-S",
     "nominal_voltage": "230/400V 50Hz",
@@ -59,9 +59,21 @@
   "rebalanced_plan": {
     "description": "Целевые показатели после переноса ТЭНа котла на L3 и бойлера ГВС на L1.",
     "phase_metrics": {
-      "L1": { "voltage_avg_v": 223.0, "total_current_a": 6.20, "total_power_w": 1380.0 },
-      "L2": { "voltage_avg_v": 221.0, "total_current_a": 4.50, "total_power_w": 990.0 },
-      "L3": { "voltage_avg_v": 224.5, "total_current_a": 7.50, "total_power_w": 1680.0 }
+      "L1": {
+        "voltage_avg_v": 223.0,
+        "total_current_a": 6.2,
+        "total_power_w": 1380.0
+      },
+      "L2": {
+        "voltage_avg_v": 221.0,
+        "total_current_a": 4.5,
+        "total_power_w": 990.0
+      },
+      "L3": {
+        "voltage_avg_v": 224.5,
+        "total_current_a": 7.5,
+        "total_power_w": 1680.0
+      }
     },
     "asymmetry": {
       "neutral_displacement_voltage_v": 1.5,
@@ -166,16 +178,17 @@
       "category": "heating",
       "type": "smart_breaker_sy2",
       "rated_current_a": 16,
-      "voltage_v": 206.9,
-      "current_a": 14.99,
-      "power_w": 3107.0,
-      "temperature_c": 39,
+      "voltage_v": 220.1,
+      "current_a": 0.0,
+      "power_w": 0.0,
+      "temperature_c": 37,
       "state": "ON",
-      "load_percent": 93.7,
+      "load_percent": 0.0,
       "alert_level": "critical",
       "din_rail": 2,
       "din_position": 1,
-      "notes": "Критическая нагрузка! 94% от 16А, просадка до 206.9В"
+      "notes": "Критическая нагрузка! 94% от 16А, просадка до 206.9В",
+      "tuya_device_id": "bfc965e579c1ef02bfc5ub"
     },
     {
       "id": "L1-02",
@@ -184,16 +197,17 @@
       "category": "auxiliary",
       "type": "smart_breaker_sy2",
       "rated_current_a": 16,
-      "voltage_v": 202.1,
+      "voltage_v": 223.3,
       "current_a": 0.0,
       "power_w": 0.0,
-      "temperature_c": 32,
+      "temperature_c": 27,
       "state": "OFF",
       "load_percent": 0.0,
       "alert_level": "warning",
       "din_rail": 2,
       "din_position": 2,
-      "notes": "Выключен. Фиксирует рекордную просадку шины L1 до 202.1В"
+      "notes": "Выключен. Фиксирует рекордную просадку шины L1 до 202.1В",
+      "tuya_device_id": "bfab2222d3f84761bbawom"
     },
     {
       "id": "L1-03",
@@ -202,16 +216,17 @@
       "category": "sockets",
       "type": "smart_breaker_sy2",
       "rated_current_a": 16,
-      "voltage_v": 203.5,
+      "voltage_v": 220.7,
       "current_a": 0.0,
       "power_w": 0.0,
-      "temperature_c": 31,
-      "state": "OFF",
+      "temperature_c": 26,
+      "state": "ON",
       "load_percent": 0.0,
       "alert_level": "normal",
       "din_rail": 2,
       "din_position": 3,
-      "notes": "Выключен, розетка резервного питания"
+      "notes": "Выключен, розетка резервного питания",
+      "tuya_device_id": "bfcab9dd3e177918d3z5im"
     },
     {
       "id": "L1-04",
@@ -220,16 +235,17 @@
       "category": "rooms",
       "type": "smart_breaker_sy2",
       "rated_current_a": 16,
-      "voltage_v": 207.3,
+      "voltage_v": 210.6,
       "current_a": 0.0,
       "power_w": 0.0,
-      "temperature_c": 36,
+      "temperature_c": 35,
       "state": "ON",
       "load_percent": 0.0,
       "alert_level": "normal",
       "din_rail": 2,
       "din_position": 4,
-      "notes": "Комната Юли (без нагрузки)"
+      "notes": "Комната Юли (без нагрузки)",
+      "tuya_device_id": "bfe8128a1ec126b4aajjf0"
     },
     {
       "id": "L1-05",
@@ -238,16 +254,17 @@
       "category": "sockets",
       "type": "smart_breaker_sy2",
       "rated_current_a": 16,
-      "voltage_v": 210.2,
+      "voltage_v": 220.3,
       "current_a": 0.0,
       "power_w": 0.0,
-      "temperature_c": 31,
+      "temperature_c": 27,
       "state": "ON",
       "load_percent": 0.0,
       "alert_level": "normal",
       "din_rail": 2,
       "din_position": 5,
-      "notes": "Розетки нижнего уровня"
+      "notes": "Розетки нижнего уровня",
+      "tuya_device_id": "bf71b5a73f4168ee07w7ur"
     },
     {
       "id": "L1-06",
@@ -256,16 +273,17 @@
       "category": "pumps",
       "type": "smart_breaker_sy2",
       "rated_current_a": 16,
-      "voltage_v": 211.4,
+      "voltage_v": 220.0,
       "current_a": 0.0,
       "power_w": 0.0,
-      "temperature_c": 30,
+      "temperature_c": 25,
       "state": "ON",
       "load_percent": 0.0,
       "alert_level": "normal",
       "din_rail": 2,
       "din_position": 6,
-      "notes": "Насосная группа (в режиме ожидания)"
+      "notes": "Насосная группа (в режиме ожидания)",
+      "tuya_device_id": "bffc620d1fd808980aqcyl"
     },
     {
       "id": "L1-07",
@@ -274,16 +292,17 @@
       "category": "rooms",
       "type": "smart_breaker_sy2",
       "rated_current_a": 10,
-      "voltage_v": 212.0,
-      "current_a": 0.0,
-      "power_w": 0.0,
-      "temperature_c": 39,
+      "voltage_v": 221.9,
+      "current_a": 0.063,
+      "power_w": 6.1,
+      "temperature_c": 37,
       "state": "ON",
-      "load_percent": 0.0,
+      "load_percent": 0.6,
       "alert_level": "normal",
       "din_rail": 2,
       "din_position": 7,
-      "notes": "Освещение и розетки гардероба"
+      "notes": "Освещение и розетки гардероба",
+      "tuya_device_id": "bfce05d3f868374088hnzt"
     },
     {
       "id": "L2-01",
@@ -292,16 +311,17 @@
       "category": "heating",
       "type": "smart_breaker_sy2",
       "rated_current_a": 16,
-      "voltage_v": 215.5,
-      "current_a": 0.987,
-      "power_w": 170.1,
-      "temperature_c": 39,
+      "voltage_v": 219.6,
+      "current_a": 2.153,
+      "power_w": 371.3,
+      "temperature_c": 38,
       "state": "ON",
-      "load_percent": 6.2,
+      "load_percent": 13.5,
       "alert_level": "normal",
       "din_rail": 3,
       "din_position": 1,
-      "notes": "Бойлер / водоочистка / тэн"
+      "notes": "Бойлер / водоочистка / тэн",
+      "tuya_device_id": "bff0b46eeb097972bbmgxr"
     },
     {
       "id": "L2-02",
@@ -310,16 +330,17 @@
       "category": "rooms",
       "type": "smart_breaker_sy2",
       "rated_current_a": 16,
-      "voltage_v": 216.0,
-      "current_a": 0.38,
-      "power_w": 51.0,
+      "voltage_v": 212.7,
+      "current_a": 0.068,
+      "power_w": 7.3,
       "temperature_c": 35,
       "state": "ON",
-      "load_percent": 2.4,
+      "load_percent": 0.4,
       "alert_level": "normal",
       "din_rail": 3,
       "din_position": 2,
-      "notes": "Освещение и электроприборы холла"
+      "notes": "Освещение и электроприборы холла",
+      "tuya_device_id": "bf14287ed092c5dee1zjud"
     },
     {
       "id": "L2-03",
@@ -328,16 +349,17 @@
       "category": "pumps",
       "type": "smart_breaker_sy2",
       "rated_current_a": 16,
-      "voltage_v": 217.2,
-      "current_a": 0.096,
-      "power_w": 2.3,
-      "temperature_c": 43,
+      "voltage_v": 219.4,
+      "current_a": 0.09,
+      "power_w": 8.8,
+      "temperature_c": 38,
       "state": "ON",
       "load_percent": 0.6,
       "alert_level": "warning",
       "din_rail": 3,
       "din_position": 3,
-      "notes": "Внимание! Повышенная температура 43°C при минимальном токе"
+      "notes": "Внимание! Повышенная температура 43°C при минимальном токе",
+      "tuya_device_id": "bfa92f1867b9adfb9d6co0"
     },
     {
       "id": "L2-04",
@@ -346,16 +368,17 @@
       "category": "rooms",
       "type": "smart_breaker_sy2",
       "rated_current_a": 16,
-      "voltage_v": 217.3,
-      "current_a": 0.193,
-      "power_w": 13.0,
-      "temperature_c": 39,
+      "voltage_v": 218.6,
+      "current_a": 0.187,
+      "power_w": 12.9,
+      "temperature_c": 37,
       "state": "ON",
       "load_percent": 1.2,
       "alert_level": "normal",
       "din_rail": 3,
       "din_position": 4,
-      "notes": "Розетки и подсветка спальни"
+      "notes": "Розетки и подсветка спальни",
+      "tuya_device_id": "bf5d27e9a8a6629542nagt"
     },
     {
       "id": "L2-05",
@@ -364,16 +387,17 @@
       "category": "rooms",
       "type": "smart_breaker_sy2",
       "rated_current_a": 10,
-      "voltage_v": 218.7,
-      "current_a": 0.0,
-      "power_w": 0.0,
-      "temperature_c": 39,
+      "voltage_v": 217.2,
+      "current_a": 0.244,
+      "power_w": 22.6,
+      "temperature_c": 37,
       "state": "ON",
-      "load_percent": 0.0,
+      "load_percent": 2.4,
       "alert_level": "normal",
       "din_rail": 3,
       "din_position": 5,
-      "notes": "Санузел"
+      "notes": "Санузел",
+      "tuya_device_id": "bff20b7cc381404f36qoco"
     },
     {
       "id": "L2-06",
@@ -382,16 +406,17 @@
       "category": "rooms",
       "type": "smart_breaker_sy2",
       "rated_current_a": 16,
-      "voltage_v": 218.8,
-      "current_a": 0.0,
-      "power_w": 0.0,
-      "temperature_c": 38,
+      "voltage_v": 217.8,
+      "current_a": 0.626,
+      "power_w": 80.4,
+      "temperature_c": 37,
       "state": "ON",
-      "load_percent": 0.0,
+      "load_percent": 3.9,
       "alert_level": "normal",
       "din_rail": 3,
       "din_position": 6,
-      "notes": "Гостиная"
+      "notes": "Гостиная",
+      "tuya_device_id": "bf543988ab77b2e86cscmf"
     },
     {
       "id": "L2-07",
@@ -400,16 +425,17 @@
       "category": "kitchen",
       "type": "smart_breaker_sy2",
       "rated_current_a": 16,
-      "voltage_v": 219.1,
-      "current_a": 0.177,
-      "power_w": 15.7,
-      "temperature_c": 38,
+      "voltage_v": 218.4,
+      "current_a": 1.042,
+      "power_w": 144.9,
+      "temperature_c": 37,
       "state": "ON",
-      "load_percent": 1.1,
+      "load_percent": 6.5,
       "alert_level": "normal",
       "din_rail": 3,
       "din_position": 7,
-      "notes": "Кухонные розетки базовые"
+      "notes": "Кухонные розетки базовые",
+      "tuya_device_id": "bfafef4ce169ab1432u4mw"
     },
     {
       "id": "L2-08",
@@ -418,16 +444,17 @@
       "category": "rooms",
       "type": "smart_breaker_sy2",
       "rated_current_a": 16,
-      "voltage_v": 219.7,
-      "current_a": 0.034,
-      "power_w": 2.6,
-      "temperature_c": 40,
+      "voltage_v": 218.6,
+      "current_a": 0.037,
+      "power_w": 3.5,
+      "temperature_c": 39,
       "state": "ON",
       "load_percent": 0.2,
       "alert_level": "normal",
       "din_rail": 3,
       "din_position": 8,
-      "notes": "Детская комната Мелании"
+      "notes": "Детская комната Мелании",
+      "tuya_device_id": "bf4477dfe91ae5ef73akin"
     },
     {
       "id": "L2-09",
@@ -436,7 +463,7 @@
       "category": "kitchen",
       "type": "smart_breaker_sy2",
       "rated_current_a": 10,
-      "voltage_v": 220.0,
+      "voltage_v": 222.0,
       "current_a": 0.0,
       "power_w": 0.0,
       "temperature_c": 34,
@@ -445,7 +472,8 @@
       "alert_level": "normal",
       "din_rail": 3,
       "din_position": 9,
-      "notes": "Кухонная вытяжка"
+      "notes": "Кухонная вытяжка",
+      "tuya_device_id": "bf16944aaad848c374qi77"
     },
     {
       "id": "L2-10",
@@ -454,7 +482,7 @@
       "category": "kitchen",
       "type": "smart_breaker_sy2",
       "rated_current_a": 20,
-      "voltage_v": 220.3,
+      "voltage_v": 221.4,
       "current_a": 0.0,
       "power_w": 0.0,
       "temperature_c": 32,
@@ -463,7 +491,8 @@
       "alert_level": "normal",
       "din_rail": 4,
       "din_position": 1,
-      "notes": "Индукционная панель (выкл в данный момент)"
+      "notes": "Индукционная панель (выкл в данный момент)",
+      "tuya_device_id": "bf5f6dc4a4e8fc0c47hgaw"
     },
     {
       "id": "L2-11",
@@ -472,7 +501,7 @@
       "category": "appliances",
       "type": "smart_breaker_sy2",
       "rated_current_a": 16,
-      "voltage_v": 220.4,
+      "voltage_v": 220.0,
       "current_a": 0.0,
       "power_w": 0.0,
       "temperature_c": 33,
@@ -481,7 +510,8 @@
       "alert_level": "normal",
       "din_rail": 4,
       "din_position": 2,
-      "notes": "Посудомоечная машина"
+      "notes": "Посудомоечная машина",
+      "tuya_device_id": "bf7240dda56f6f5fb5w3rc"
     },
     {
       "id": "L2-12",
@@ -490,16 +520,17 @@
       "category": "lighting",
       "type": "smart_breaker_sy2",
       "rated_current_a": 10,
-      "voltage_v": 220.5,
-      "current_a": 0.179,
-      "power_w": 23.5,
+      "voltage_v": 222.0,
+      "current_a": 0.025,
+      "power_w": 2.4,
       "temperature_c": 36,
       "state": "ON",
-      "load_percent": 1.8,
+      "load_percent": 0.2,
       "alert_level": "normal",
       "din_rail": 4,
       "din_position": 3,
-      "notes": "Основное светодиодное освещение дома"
+      "notes": "Основное светодиодное освещение дома",
+      "tuya_device_id": "bf063d7bfa8cd5f1b6vazr"
     },
     {
       "id": "L2-13",
@@ -508,7 +539,7 @@
       "category": "climate",
       "type": "smart_breaker_sy2",
       "rated_current_a": 16,
-      "voltage_v": 221.1,
+      "voltage_v": 219.5,
       "current_a": 0.0,
       "power_w": 0.0,
       "temperature_c": 31,
@@ -517,7 +548,8 @@
       "alert_level": "normal",
       "din_rail": 4,
       "din_position": 4,
-      "notes": "Сплит-система"
+      "notes": "Сплит-система",
+      "tuya_device_id": "bf13a6236e804fb7famwyu"
     },
     {
       "id": "L2-14",
@@ -526,16 +558,17 @@
       "category": "appliances",
       "type": "smart_breaker_sy2",
       "rated_current_a": 16,
-      "voltage_v": 221.2,
-      "current_a": 0.075,
-      "power_w": 3.1,
+      "voltage_v": 223.2,
+      "current_a": 0.076,
+      "power_w": 3.0,
       "temperature_c": 37,
       "state": "ON",
       "load_percent": 0.5,
       "alert_level": "normal",
       "din_rail": 4,
       "din_position": 5,
-      "notes": "Стиральная машина и локальный бойлер"
+      "notes": "Стиральная машина и локальный бойлер",
+      "tuya_device_id": "bf3996a1aa37cbb90a3jsu"
     },
     {
       "id": "L2-15",
@@ -544,16 +577,17 @@
       "category": "kitchen",
       "type": "smart_breaker_sy2",
       "rated_current_a": 16,
-      "voltage_v": 221.2,
+      "voltage_v": 220.0,
       "current_a": 0.095,
-      "power_w": 3.0,
+      "power_w": 3.1,
       "temperature_c": 35,
       "state": "ON",
       "load_percent": 0.6,
       "alert_level": "normal",
       "din_rail": 4,
       "din_position": 6,
-      "notes": "СВЧ печь (дежурный режим)"
+      "notes": "СВЧ печь (дежурный режим)",
+      "tuya_device_id": "bfbb890a642f9f8cfbaepu"
     },
     {
       "id": "L2-16",
@@ -562,16 +596,17 @@
       "category": "heating",
       "type": "smart_breaker_sy2",
       "rated_current_a": 16,
-      "voltage_v": 221.5,
-      "current_a": 0.877,
-      "power_w": 74.8,
-      "temperature_c": 38,
+      "voltage_v": 220.0,
+      "current_a": 0.873,
+      "power_w": 74.9,
+      "temperature_c": 36,
       "state": "ON",
       "load_percent": 5.5,
       "alert_level": "normal",
       "din_rail": 4,
       "din_position": 7,
-      "notes": "Накопительный водонагреватель ГВС"
+      "notes": "Накопительный водонагреватель ГВС",
+      "tuya_device_id": "bf7cc003cb31feb0f1cdgk"
     },
     {
       "id": "L2-17",
@@ -580,16 +615,17 @@
       "category": "appliances",
       "type": "smart_breaker_sy2",
       "rated_current_a": 16,
-      "voltage_v": 223.2,
-      "current_a": 0.512,
-      "power_w": 109.3,
+      "voltage_v": 225.3,
+      "current_a": 0.153,
+      "power_w": 8.5,
       "temperature_c": 35,
       "state": "ON",
-      "load_percent": 3.2,
+      "load_percent": 1.0,
       "alert_level": "normal",
       "din_rail": 4,
       "din_position": 8,
-      "notes": "Морозильная камера / холодильник"
+      "notes": "Морозильная камера / холодильник",
+      "tuya_device_id": "bf34878732251d9e1dleee"
     },
     {
       "id": "L2-18",
@@ -598,16 +634,17 @@
       "category": "network",
       "type": "smart_breaker_sy2",
       "rated_current_a": 10,
-      "voltage_v": 223.3,
+      "voltage_v": 224.1,
       "current_a": 0.057,
-      "power_w": 6.0,
+      "power_w": 5.9,
       "temperature_c": 36,
       "state": "ON",
       "load_percent": 0.6,
       "alert_level": "normal",
       "din_rail": 4,
       "din_position": 9,
-      "notes": "Сетевое оборудование, Wi-Fi и видеонаблюдение"
+      "notes": "Сетевое оборудование, Wi-Fi и видеонаблюдение",
+      "tuya_device_id": "bf14e8afaf98542f36jmnh"
     },
     {
       "id": "L3-01",
@@ -616,16 +653,17 @@
       "category": "kitchen",
       "type": "smart_breaker_sy2",
       "rated_current_a": 16,
-      "voltage_v": 229.2,
-      "current_a": 0.414,
-      "power_w": 95.1,
-      "temperature_c": 39,
+      "voltage_v": 215.3,
+      "current_a": 15.945,
+      "power_w": 3455.1,
+      "temperature_c": 38,
       "state": "ON",
-      "load_percent": 2.6,
+      "load_percent": 99.7,
       "alert_level": "normal",
       "din_rail": 5,
       "din_position": 1,
-      "notes": "Плита/посудомойка/духовка/2-й ключ ТЭНа"
+      "notes": "Плита/посудомойка/духовка/2-й ключ ТЭНа",
+      "tuya_device_id": "bf383e5f222ec612acyw6d"
     },
     {
       "id": "L3-02",
@@ -634,16 +672,17 @@
       "category": "sockets",
       "type": "smart_breaker_sy2",
       "rated_current_a": 16,
-      "voltage_v": 229.7,
+      "voltage_v": 218.2,
       "current_a": 0.0,
       "power_w": 0.0,
-      "temperature_c": 30,
+      "temperature_c": 25,
       "state": "OFF",
       "load_percent": 0.0,
       "alert_level": "normal",
       "din_rail": 5,
       "din_position": 2,
-      "notes": "Розетки верхнего яруса (выключен)"
+      "notes": "Розетки верхнего яруса (выключен)",
+      "tuya_device_id": "bf9adcabf6cfdce12ephop"
     },
     {
       "id": "L3-03",
@@ -661,7 +700,8 @@
       "alert_level": "warning",
       "din_rail": 5,
       "din_position": 3,
-      "notes": "Завышенное напряжение 242.1В из-за перекоса фаз!"
+      "notes": "Завышенное напряжение 242.1В из-за перекоса фаз!",
+      "tuya_device_id": "bf52496ce015338397z6iq"
     }
   ]
 }

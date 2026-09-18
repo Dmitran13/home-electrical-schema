@@ -40,11 +40,11 @@ TEMP_CRIT_C = 50.0             # °C
 # Коды DPS автоматов Tuya SY2. Проверьте реальные коды своего устройства
 # в Tuya IoT Platform (Cloud -> API Explorer -> Device Status) и поправьте здесь.
 DPS_CODE_MAP = {
-    "switch": "switch_1",
+    "switch": "switch",
     "voltage": "cur_voltage",      # в 0.1 В
     "current": "cur_current",      # в мА
     "power": "cur_power",          # в 0.1 Вт
-    "temperature": "temp_current",  # в °C
+    "temperature": "temp_value",   # в °C
 }
 
 # Стандартные цвета для терминального вывода
@@ -375,6 +375,7 @@ def load_local_schema(filepath: str) -> Dict[str, Any]:
 
 def save_schema(data: Dict[str, Any], filepath: str):
     """Сохранение обновленной схемы в JSON файл."""
+    data["updated_at"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 

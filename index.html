@@ -69,9 +69,10 @@
           </button>
         </div>
 
-        <button onclick="refreshData()" title="Обновить телеметрию" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
+        <button onclick="refreshData()" title="Синхронизировать с Tuya Cloud" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
           <i class="fa-solid fa-rotate text-sm" id="refresh-icon"></i>
         </button>
+        <span id="refresh-status" class="text-xs text-slate-500"></span>
       </div>
     </div>
   </header>
@@ -412,7 +413,7 @@
     // Загрузка schema_data.json
     async function loadData() {
       try {
-        const resp = await fetch('schema_data.json');
+        const resp = await fetch('schema_data.json?t=' + Date.now(), { cache: 'no-store' });
         if (resp.ok) {
           rawData = await resp.json();
         } else {
@@ -421,6 +422,10 @@
       } catch (e) {
         console.warn('Используются встроенные резервные данные телеметрии:', e);
         rawData = getFallbackData();
+      }
+      const status = document.getElementById('refresh-status');
+      if (status && !status.textContent && rawData.updated_at) {
+        status.textContent = 'данные на ' + new Date(rawData.updated_at).toLocaleString('ru-RU');
       }
       renderDashboard();
     }
@@ -698,13 +703,25 @@
       document.getElementById('device-modal').classList.add('hidden');
     }
 
-    function refreshData() {
+    async function refreshData() {
       const icon = document.getElementById('refresh-icon');
+      const status = document.getElementById('refresh-status');
       icon.classList.add('fa-spin');
-      setTimeout(() => {
-        loadData();
+      status.textContent = 'синк с Tuya Cloud...';
+      try {
+        const resp = await fetch('refresh', { method: 'POST' });
+        const result = await resp.json();
+        if (!resp.ok || !result.ok) {
+          throw new Error(result.error || `HTTP ${resp.status}`);
+        }
+        await loadData();
+        status.textContent = 'обновлено ' + new Date().toLocaleTimeString('ru-RU');
+      } catch (e) {
+        console.error('Ошибка синхронизации с Tuya Cloud:', e);
+        status.textContent = 'ошибка синка: ' + e.message;
+      } finally {
         icon.classList.remove('fa-spin');
-      }, 500);
+      }
     }
 
     // Резервная заглушка на случай, если schema_data.json недоступен (например, открыт как file://).
