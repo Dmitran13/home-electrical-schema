@@ -11,8 +11,15 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 echo "=== Копируем статику и бэкенд кнопки 'Обновить' ==="
 ssh "$SERVER" "mkdir -p '$DEPLOY_DIR'"
-rsync -az "$PROJECT_DIR/index.html" "$PROJECT_DIR/schema_data.json" "$PROJECT_DIR/electrical_schema.svg" \
+rsync -az "$PROJECT_DIR/index.html" "$PROJECT_DIR/electrical_schema.svg" \
   "$PROJECT_DIR/refresh_server.py" "$PROJECT_DIR/tuya_monitor.py" "$SERVER:$DEPLOY_DIR/"
+
+# schema_data.json на сервере — живой файл, его пишет кнопка "Обновить" через Tuya Cloud.
+# Кладём из git только при первом деплое, иначе каждый деплой затирал бы live-данные старым снимком.
+ssh "$SERVER" "[ -f '$DEPLOY_DIR/schema_data.json' ] || echo NEED_SEED" | grep -q NEED_SEED \
+  && rsync -az "$PROJECT_DIR/schema_data.json" "$SERVER:$DEPLOY_DIR/" \
+  && echo "  schema_data.json отсутствовал на сервере — залили стартовый снимок из git" \
+  || echo "  schema_data.json на сервере уже live — не трогаем"
 
 # rsync льёт файлы от root, а бэкенд (systemd User=www-data) должен иметь право их перезаписывать
 ssh "$SERVER" "chown -R www-data:www-data '$DEPLOY_DIR'"
