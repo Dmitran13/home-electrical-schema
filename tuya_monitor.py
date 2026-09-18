@@ -293,6 +293,43 @@ class PhaseAnalyzer:
         }
 
 
+PHASE_NAMES = {"L1": "Фаза 1 (L1)", "L2": "Фаза 2 (L2)", "L3": "Фаза 3 (L3)"}
+PHASE_COLORS = {"L1": "#ef4444", "L2": "#10b981", "L3": "#8b5cf6"}
+
+
+def sync_summary_into_schema(schema: Dict[str, Any], analysis: Dict[str, Any]):
+    """Переносит свежую сводку PhaseAnalyzer в schema['phase_metrics']/['asymmetry_analysis'] —
+    именно эти поля рисует дашборд, а не сырые данные по устройствам."""
+    s = analysis["phase_summary"]
+    metrics = schema.setdefault("phase_metrics", {})
+    for ph in ("L1", "L2", "L3"):
+        m = s[ph]
+        if m["total_current"] <= 1.0:
+            status, assessment = "UNDERLOAD", f"Фаза слабо загружена ({m['total_current']:.2f}А)."
+        elif m["avg_voltage"] and (m["avg_voltage"] < VOLTAGE_LOW_WARNING or m["avg_voltage"] > VOLTAGE_HIGH_WARNING):
+            status, assessment = "VOLTAGE_WARNING", f"Напряжение вне нормы: {m['avg_voltage']:.1f}В."
+        else:
+            status, assessment = "NORMAL", f"Ток {m['total_current']:.2f}А, напряжение {m['avg_voltage']:.1f}В — штатно."
+        metrics.setdefault(ph, {})
+        metrics[ph].update({
+            "phase_name": PHASE_NAMES[ph],
+            "color": PHASE_COLORS[ph],
+            "voltage_avg_v": m["avg_voltage"],
+            "voltage_min_v": m["min_voltage"],
+            "voltage_max_v": m["max_voltage"],
+            "total_current_a": m["total_current"],
+            "total_power_w": m["total_power_w"],
+            "device_count": m["device_count"],
+            "status": status,
+            "assessment": assessment,
+        })
+
+    asym = schema.setdefault("asymmetry_analysis", {})
+    asym["phase_voltage_spread_v"] = analysis["voltage_spread_v"]
+    asym["current_unbalance_ratio_pct"] = analysis["current_unbalance_pct"]
+    asym["risk_level"] = "HIGH" if analysis["voltage_spread_v"] >= 15 else ("MEDIUM" if analysis["voltage_spread_v"] >= 8 else "LOW")
+
+
 def print_dashboard(analysis: Dict[str, Any]):
     """Вывод цветного отчета мониторинга в терминал."""
     s = analysis["phase_summary"]
@@ -435,6 +472,7 @@ def main():
         print_dashboard(analysis)
 
         if args.export:
+            sync_summary_into_schema(schema, analysis)
             save_schema(schema, args.export)
             print(f"[EXPORT] Данные сохранены в {args.export}")
 

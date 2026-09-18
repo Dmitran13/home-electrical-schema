@@ -50,7 +50,7 @@
         <div>
           <h1 class="text-lg sm:text-xl font-bold tracking-tight text-white flex items-center gap-2">
             Home Power System
-            <span class="text-xs font-mono font-normal px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
+            <span id="header-badge" class="text-xs font-mono font-normal px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
               <i class="fa-solid fa-triangle-exclamation mr-1"></i>ДИСБАЛАНС НАГРУЗКИ
             </span>
           </h1>
@@ -448,6 +448,18 @@
 
       const isRebalanced = (currentMode === 'rebalanced');
       const alertBox = document.getElementById('imbalance-alert-box');
+      const headerBadge = document.getElementById('header-badge');
+      const riskLevel = isRebalanced ? 'LOW' : (rawData.asymmetry_analysis.risk_level || 'HIGH');
+      if (riskLevel === 'LOW') {
+        headerBadge.className = 'text-xs font-mono font-normal px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+        headerBadge.innerHTML = '<i class="fa-solid fa-check mr-1"></i>ФАЗЫ СБАЛАНСИРОВАНЫ';
+      } else if (riskLevel === 'MEDIUM') {
+        headerBadge.className = 'text-xs font-mono font-normal px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30';
+        headerBadge.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-1"></i>ПЕРЕКОС ФАЗ';
+      } else {
+        headerBadge.className = 'text-xs font-mono font-normal px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30';
+        headerBadge.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-1"></i>ДИСБАЛАНС НАГРУЗКИ';
+      }
 
       if (isRebalanced) {
         const spread = rawData.rebalanced_plan.asymmetry.phase_voltage_spread_v.toFixed(1);
@@ -475,30 +487,55 @@
           </div>
         `;
       } else {
+        const m = rawData.phase_metrics;
         const spread = rawData.asymmetry_analysis.phase_voltage_spread_v.toFixed(1);
-        alertBox.className = "bg-gradient-to-r from-rose-950/70 via-slate-900 to-amber-950/70 border border-rose-600/40 rounded-2xl p-5 shadow-2xl relative overflow-hidden";
-        alertBox.innerHTML = `
-          <div class="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div class="space-y-1">
-              <div class="flex items-center gap-2">
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-600 text-white alert-pulse">
-                  КРИТИЧЕСКИЙ ПЕРЕКОС ФАЗ
-                </span>
-                <span class="text-xs text-slate-400 font-mono">ΔU = ${spread} В • Смещение потенциала нейтрали</span>
+        const riskLevel = rawData.asymmetry_analysis.risk_level || (spread >= 15 ? 'HIGH' : spread >= 8 ? 'MEDIUM' : 'LOW');
+        const [maxPh, minPh] = [['L1', 'L2', 'L3'].reduce((a, b) => m[a].total_current_a >= m[b].total_current_a ? a : b),
+                                 ['L1', 'L2', 'L3'].reduce((a, b) => m[a].total_current_a <= m[b].total_current_a ? a : b)];
+
+        if (riskLevel === 'LOW') {
+          alertBox.className = "bg-gradient-to-r from-emerald-950/70 via-slate-900 to-teal-950/70 border border-emerald-600/40 rounded-2xl p-5 shadow-2xl relative overflow-hidden";
+          alertBox.innerHTML = `
+            <div class="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-600 text-white">
+                    ФАЗЫ СБАЛАНСИРОВАНЫ
+                  </span>
+                  <span class="text-xs text-slate-400 font-mono">ΔU = ${spread} В</span>
+                </div>
+                <h2 class="text-base sm:text-lg font-bold text-white">
+                  Нагрузка распределена ровно: макс. ${m[maxPh].phase_name} (${m[maxPh].total_current_a.toFixed(2)}A), мин. ${m[minPh].phase_name} (${m[minPh].total_current_a.toFixed(2)}A)
+                </h2>
               </div>
-              <h2 class="text-base sm:text-lg font-bold text-white">
-                Фаза 1 перегружена ТЭНом котла (14.99A / 206.9В), а Фаза 3 недогружена (0.41A / 242.1В)
-              </h2>
-              <p class="text-xs text-slate-300 max-w-3xl">
-                Из-за мощной нагрузки 3.1 кВт на Фазе 1 при почти нулевой нагрузке на Фазе 3 нулевая точка смещается в сторону L1.
-                Это вызывает просадку L1 (до 202.1В) и опасный скачок L3 (до 242.1В), угрожая технике.
-              </p>
             </div>
-            <button onclick="document.getElementById('rebalance-section').scrollIntoView({behavior: 'smooth'})" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl shadow-lg transition flex items-center gap-2">
-              <i class="fa-solid fa-screwdriver-wrench"></i> План перекоммутации
-            </button>
-          </div>
-        `;
+          `;
+        } else {
+          const badgeClass = riskLevel === 'HIGH' ? 'bg-rose-600 alert-pulse' : 'bg-amber-500 text-slate-950';
+          const badgeText = riskLevel === 'HIGH' ? 'КРИТИЧЕСКИЙ ПЕРЕКОС ФАЗ' : 'ПЕРЕКОС ФАЗ';
+          alertBox.className = "bg-gradient-to-r from-rose-950/70 via-slate-900 to-amber-950/70 border border-rose-600/40 rounded-2xl p-5 shadow-2xl relative overflow-hidden";
+          alertBox.innerHTML = `
+            <div class="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold text-white ${badgeClass}">
+                    ${badgeText}
+                  </span>
+                  <span class="text-xs text-slate-400 font-mono">ΔU = ${spread} В • Смещение потенциала нейтрали</span>
+                </div>
+                <h2 class="text-base sm:text-lg font-bold text-white">
+                  ${m[maxPh].phase_name} перегружена (${m[maxPh].total_current_a.toFixed(2)}A / ${m[maxPh].voltage_avg_v.toFixed(1)}В), а ${m[minPh].phase_name} недогружена (${m[minPh].total_current_a.toFixed(2)}A / ${m[minPh].voltage_avg_v.toFixed(1)}В)
+                </h2>
+                <p class="text-xs text-slate-300 max-w-3xl">
+                  Разброс токов между фазами смещает потенциал нейтрали — просадка на перегруженной фазе, завышение на недогруженной.
+                </p>
+              </div>
+              <button onclick="document.getElementById('rebalance-section').scrollIntoView({behavior: 'smooth'})" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl shadow-lg transition flex items-center gap-2">
+                <i class="fa-solid fa-screwdriver-wrench"></i> План перекоммутации
+              </button>
+            </div>
+          `;
+        }
       }
 
       // Карточки фаз — числа берутся из rawData, а не захардкожены
