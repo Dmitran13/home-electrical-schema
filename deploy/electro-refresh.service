@@ -1,0 +1,14 @@
+[Unit]
+Description=Home electrical schema — ручной синк с Tuya Cloud (кнопка "Обновить")
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/projects/home-electrical-schema
+EnvironmentFile=/opt/projects/home-electrical-schema/.env
+ExecStart=/usr/bin/python3 /opt/projects/home-electrical-schema/refresh_server.py
+Restart=on-failure
+User=www-data
+
+[Install]
+WantedBy=multi-user.target
