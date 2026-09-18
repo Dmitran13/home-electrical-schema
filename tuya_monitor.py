@@ -22,7 +22,7 @@ import hmac
 import hashlib
 import argparse
 from typing import Dict, List, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 # Пороги предупреждений и аварий
@@ -375,7 +375,7 @@ def load_local_schema(filepath: str) -> Dict[str, Any]:
 
 def save_schema(data: Dict[str, Any], filepath: str):
     """Сохранение обновленной схемы в JSON файл."""
-    data["updated_at"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    data["updated_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 

@@ -9,10 +9,13 @@ NGINX_CONF="/etc/nginx/electro.conf"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
-echo "=== Копируем статику и бэкенд кнопки "Обновить" ==="
+echo "=== Копируем статику и бэкенд кнопки 'Обновить' ==="
 ssh "$SERVER" "mkdir -p '$DEPLOY_DIR'"
 rsync -az "$PROJECT_DIR/index.html" "$PROJECT_DIR/schema_data.json" "$PROJECT_DIR/electrical_schema.svg" \
   "$PROJECT_DIR/refresh_server.py" "$PROJECT_DIR/tuya_monitor.py" "$SERVER:$DEPLOY_DIR/"
+
+# rsync льёт файлы от root, а бэкенд (systemd User=www-data) должен иметь право их перезаписывать
+ssh "$SERVER" "chown -R www-data:www-data '$DEPLOY_DIR'"
 
 echo "=== Ключи Tuya Cloud (.env на сервере) ==="
 ssh "$SERVER" "
