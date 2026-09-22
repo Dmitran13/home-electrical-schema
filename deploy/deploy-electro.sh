@@ -49,6 +49,14 @@ ssh "$SERVER" "
   else
     echo '  TELEGRAM_BOT_TOKEN уже есть в .env — не трогаем'
   fi
+  if ! grep -q '^TELEGRAM_PROXY_URL=' '$DEPLOY_DIR/.env' 2>/dev/null; then
+    echo '  ВНИМАНИЕ: этот сервер не имеет прямого доступа к api.telegram.org'
+    echo '  (блокировка у хостера) — нужен TELEGRAM_PROXY_URL, см. tinyproxy на'
+    echo '  dmitran1.fvds.ru (креды — как у taxibot, см. память telegram-mtproto-proxy):'
+    echo '  echo TELEGRAM_PROXY_URL=http://user:pass@85.137.88.209:8899 >> $DEPLOY_DIR/.env'
+  else
+    echo '  TELEGRAM_PROXY_URL уже есть в .env — не трогаем'
+  fi
 "
 
 echo "=== systemd-сервис бэкенда (electro-refresh) ==="
