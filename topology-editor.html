@@ -23,6 +23,13 @@
         Когда закончишь — жми «Экспорт JSON», покажешь мне файл, вместе решим что катить на прод.
       </p>
       <p id="load-status" class="text-xs text-amber-400 mt-1"></p>
+      <div id="file-picker-row" class="mt-2 hidden">
+        <label class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-sm font-semibold cursor-pointer">
+          📂 Выбрать schema_data.json
+          <input type="file" id="file-input" accept=".json" class="hidden">
+        </label>
+        <span class="text-xs text-slate-500 ml-2">Файл лежит в этой же папке проекта — просто открой его в диалоге.</span>
+      </div>
     </div>
 
     <div class="flex flex-wrap gap-3">
@@ -74,27 +81,35 @@
       const resp = await fetch('schema_data.json?t=' + Date.now(), { cache: 'no-store' });
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       const data = await resp.json();
-      originalDevices = data.devices || [];
-      status.textContent = 'Загружено ' + originalDevices.length + ' устройств из schema_data.json (обновлено ' + (data.updated_at || '?') + ')';
+      applyLoadedData(data);
+    } catch (e) {
+      // Открыт двойным кликом (file://) — fetch тут не работает, браузер это блокирует.
+      // Показываем выбор файла вместо требования поднимать сервер в терминале.
+      status.textContent = 'Открой schema_data.json вручную — кнопка ниже (двойной клик по .html не даёт браузеру читать соседние файлы напрямую):';
+      status.className = 'text-xs text-amber-400 mt-1';
+      document.getElementById('file-picker-row').classList.remove('hidden');
+    }
+  }
 
-      renderFixedNodes(data.devices);
+  function applyLoadedData(data) {
+    const status = document.getElementById('load-status');
+    originalDevices = data.devices || [];
+    status.textContent = 'Загружено ' + originalDevices.length + ' устройств из schema_data.json (обновлено ' + (data.updated_at || '?') + ')';
+    status.className = 'text-xs text-emerald-400 mt-1';
+    document.getElementById('file-picker-row').classList.add('hidden');
 
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        try {
-          layout = JSON.parse(saved);
-          status.textContent += ' • восстановлена сохранённая раскладка из localStorage';
-        } catch (e) {
-          buildLayoutFromOriginal();
-        }
-      } else {
+    renderFixedNodes(data.devices);
+
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        layout = JSON.parse(saved);
+        status.textContent += ' • восстановлена сохранённая раскладка из localStorage';
+      } catch (e) {
         buildLayoutFromOriginal();
       }
-    } catch (e) {
-      status.textContent = 'Не удалось загрузить schema_data.json: ' + e.message +
-        '. Открой файл через локальный сервер (например: python3 -m http.server), не через file://';
-      status.className = 'text-xs text-rose-400 mt-1';
-      return;
+    } else {
+      buildLayoutFromOriginal();
     }
 
     const savedOutdoor = localStorage.getItem(OUTDOOR_STORAGE_KEY);
@@ -102,6 +117,20 @@
     renderOutdoor();
     renderLanes();
   }
+
+  document.getElementById('file-input').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        applyLoadedData(JSON.parse(reader.result));
+      } catch (err) {
+        document.getElementById('load-status').textContent = 'Не смог разобрать файл: ' + err.message;
+      }
+    };
+    reader.readAsText(file);
+  });
 
   function renderFixedNodes(devices) {
     const main = devices.find(d => d.category === 'input');
