@@ -1,0 +1,15 @@
+[Unit]
+Description=Home electrical schema — автономная диагностика щита (раз в час, Telegram-алерты)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/projects/home-electrical-schema
+EnvironmentFile=/opt/projects/home-electrical-schema/.env
+ExecStart=/usr/bin/python3 /opt/projects/home-electrical-schema/tuya_monitor.py --daemon --interval 3600 --schema /opt/projects/home-electrical-schema/schema_data.json --export /opt/projects/home-electrical-schema/schema_data.json
+Restart=on-failure
+RestartSec=30
+User=www-data
+
+[Install]
+WantedBy=multi-user.target

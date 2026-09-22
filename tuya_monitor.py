@@ -411,10 +411,123 @@ def load_local_schema(filepath: str) -> Dict[str, Any]:
 
 
 def save_schema(data: Dict[str, Any], filepath: str):
-    """Сохранение обновленной схемы в JSON файл."""
+    """Сохранение обновленной схемы в JSON файл (атомарно — во избежание гонки между
+    ручным 'Обновить' и фоновым демоном, которые теперь могут писать в один файл)."""
     data["updated_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    with open(filepath, "w", encoding="utf-8") as f:
+    tmp_path = f"{filepath}.tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp_path, filepath)
+
+
+def load_daemon_state(path: str) -> Optional[Dict[str, Any]]:
+    """Загрузка снимка состояния предыдущего опроса демона. None, если снимка ещё нет."""
+    p = Path(path)
+    if not p.exists():
+        return None
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def save_daemon_state(path: str, state: Dict[str, Any]):
+    """Сохранение снимка состояния для сравнения на следующем опросе."""
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(state, f, ensure_ascii=False, indent=2)
+
+
+def send_telegram_message(token: str, chat_id: str, text: str) -> bool:
+    """Отправка сообщения через Telegram Bot API (stdlib, без внешних зависимостей).
+    Если задан TELEGRAM_PROXY_URL (http://user:pass@host:port) — запрос идёт через
+    HTTP-прокси: у dmitran.fvds.ru нет прямого доступа к api.telegram.org
+    (блокировка на уровне хостера/ISP), обход — через tinyproxy на dmitran1.fvds.ru."""
+    import urllib.request
+    import urllib.parse
+    import urllib.error
+
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = urllib.parse.urlencode({"chat_id": chat_id, "text": text}).encode("utf-8")
+    proxy_url = os.environ.get("TELEGRAM_PROXY_URL")
+    opener = (
+        urllib.request.build_opener(urllib.request.ProxyHandler({"https": proxy_url}))
+        if proxy_url else urllib.request.build_opener()
+    )
+    try:
+        req = urllib.request.Request(url, data=payload, method="POST")
+        with opener.open(req, timeout=10) as resp:
+            return resp.status == 200
+    except (urllib.error.URLError, OSError) as e:
+        print(f"{Colors.RED}[TELEGRAM] Не удалось отправить сообщение: {e}{Colors.RESET}")
+        return False
+
+
+def build_state_snapshot(schema: Dict[str, Any], analysis: Dict[str, Any]) -> Dict[str, Any]:
+    """Компактный снимок состояния щита для сравнения между опросами демона."""
+    device_states = {
+        dev["id"]: dev.get("state", "ON")
+        for dev in schema.get("devices", [])
+        if "id" in dev
+    }
+    alert_keys = sorted(
+        f"{a['level']}|{a['device']}|{a['message']}" for a in analysis["alerts"]
+    )
+    risk_level = (
+        "HIGH" if analysis["voltage_spread_v"] >= 15
+        else "MEDIUM" if analysis["voltage_spread_v"] >= 8
+        else "LOW"
+    )
+    return {
+        "device_states": device_states,
+        "alert_keys": alert_keys,
+        "risk_level": risk_level,
+    }
+
+
+def build_change_message(schema: Dict[str, Any], analysis: Dict[str, Any],
+                          old_state: Dict[str, Any], new_state: Dict[str, Any]) -> Optional[str]:
+    """Формирует текст Telegram-сообщения по разнице между двумя снимками состояния.
+    Возвращает None, если ничего значимого не изменилось."""
+    names_by_id = {dev["id"]: dev["name"] for dev in schema.get("devices", []) if "id" in dev}
+    lines: List[str] = []
+
+    old_devs = old_state.get("device_states", {})
+    new_devs = new_state.get("device_states", {})
+    for dev_id, new_st in new_devs.items():
+        old_st = old_devs.get(dev_id)
+        if old_st is not None and old_st != new_st:
+            name = names_by_id.get(dev_id, dev_id)
+            lines.append(f"🔌 {name}: {old_st} → {new_st}")
+
+    old_alerts = set(old_state.get("alert_keys", []))
+    new_alerts = set(new_state.get("alert_keys", []))
+    for key in sorted(new_alerts - old_alerts):
+        level, device, message = key.split("|", 2)
+        icon = "🔴" if level == "CRITICAL" else "🟡"
+        lines.append(f"{icon} НОВЫЙ АЛЕРТ [{device}]: {message}")
+    for key in sorted(old_alerts - new_alerts):
+        level, device, message = key.split("|", 2)
+        lines.append(f"✅ Устранено [{device}]: {message}")
+
+    if old_state.get("risk_level") != new_state.get("risk_level"):
+        lines.append(f"⚖️ Риск перекоса фаз: {old_state.get('risk_level')} → {new_state.get('risk_level')}")
+
+    if not lines:
+        return None
+
+    summary = analysis["phase_summary"]
+    busiest = max(summary, key=lambda ph: summary[ph]["total_current"])
+    idlest = min(summary, key=lambda ph: summary[ph]["total_current"])
+    lines.append("")
+    lines.append(
+        f"📊 Токи: L1={summary['L1']['total_current']:.2f}A, "
+        f"L2={summary['L2']['total_current']:.2f}A, L3={summary['L3']['total_current']:.2f}A"
+    )
+    if busiest != idlest and summary[busiest]["total_current"] - summary[idlest]["total_current"] >= 3.0:
+        lines.append(f"💡 Рекомендация: перенести часть нагрузки с {busiest} на {idlest} для баланса фаз.")
+
+    return "\n".join(lines)
 
 
 def main():
@@ -442,6 +555,14 @@ def main():
     client_id = os.environ.get("TUYA_API_KEY")
     client_secret = os.environ.get("TUYA_API_SECRET")
     region = os.environ.get("TUYA_REGION", "eu")
+
+    # Проверка переменных окружения Telegram (опционально — без них диагностика просто не шлётся)
+    telegram_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    telegram_chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+    if not (telegram_token and telegram_chat_id):
+        print(f"{Colors.YELLOW}[INFO] TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID не заданы — уведомления отключены.{Colors.RESET}")
+
+    state_path = os.path.join(os.path.dirname(os.path.abspath(schema_path)), ".electro_daemon_state.json")
 
     use_live_api = bool(client_id and client_secret and not args.mock)
     client: Optional[TuyaCloudClient] = None
@@ -475,6 +596,22 @@ def main():
             sync_summary_into_schema(schema, analysis)
             save_schema(schema, args.export)
             print(f"[EXPORT] Данные сохранены в {args.export}")
+
+        new_state = build_state_snapshot(schema, analysis)
+        old_state = load_daemon_state(state_path)
+        should_save_state = True
+        if old_state is not None:
+            message = build_change_message(schema, analysis, old_state, new_state)
+            if message:
+                print(f"{Colors.CYAN}[DIAGNOSIS] Обнаружены изменения:{Colors.RESET}\n{message}")
+                if telegram_token and telegram_chat_id:
+                    if send_telegram_message(telegram_token, telegram_chat_id, message):
+                        print(f"{Colors.CYAN}[TELEGRAM] Уведомление отправлено{Colors.RESET}")
+                    else:
+                        # Не фиксируем снимок — иначе изменение потеряется из следующего сравнения
+                        should_save_state = False
+        if should_save_state:
+            save_daemon_state(state_path, new_state)
 
         if not args.daemon:
             break
