@@ -439,16 +439,24 @@ def save_daemon_state(path: str, state: Dict[str, Any]):
 
 
 def send_telegram_message(token: str, chat_id: str, text: str) -> bool:
-    """Отправка сообщения через Telegram Bot API (stdlib, без внешних зависимостей)."""
+    """Отправка сообщения через Telegram Bot API (stdlib, без внешних зависимостей).
+    Если задан TELEGRAM_PROXY_URL (http://user:pass@host:port) — запрос идёт через
+    HTTP-прокси: у dmitran.fvds.ru нет прямого доступа к api.telegram.org
+    (блокировка на уровне хостера/ISP), обход — через tinyproxy на dmitran1.fvds.ru."""
     import urllib.request
     import urllib.parse
     import urllib.error
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = urllib.parse.urlencode({"chat_id": chat_id, "text": text}).encode("utf-8")
+    proxy_url = os.environ.get("TELEGRAM_PROXY_URL")
+    opener = (
+        urllib.request.build_opener(urllib.request.ProxyHandler({"https": proxy_url}))
+        if proxy_url else urllib.request.build_opener()
+    )
     try:
         req = urllib.request.Request(url, data=payload, method="POST")
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with opener.open(req, timeout=10) as resp:
             return resp.status == 200
     except (urllib.error.URLError, OSError) as e:
         print(f"{Colors.RED}[TELEGRAM] Не удалось отправить сообщение: {e}{Colors.RESET}")
