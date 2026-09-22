@@ -417,6 +417,23 @@ def save_schema(data: Dict[str, Any], filepath: str):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
+def send_telegram_message(token: str, chat_id: str, text: str) -> bool:
+    """Отправка сообщения через Telegram Bot API (stdlib, без внешних зависимостей)."""
+    import urllib.request
+    import urllib.parse
+    import urllib.error
+
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = urllib.parse.urlencode({"chat_id": chat_id, "text": text}).encode("utf-8")
+    try:
+        req = urllib.request.Request(url, data=payload, method="POST")
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return resp.status == 200
+    except (urllib.error.URLError, OSError) as e:
+        print(f"{Colors.RED}[TELEGRAM] Не удалось отправить сообщение: {e}{Colors.RESET}")
+        return False
+
+
 def main():
     parser = argparse.ArgumentParser(description="Tuya Home Electrical Monitoring & Imbalance Analyzer")
     parser.add_argument("--schema", default="schema_data.json", help="Путь к файлу schema_data.json")
