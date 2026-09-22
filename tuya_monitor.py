@@ -417,6 +417,24 @@ def save_schema(data: Dict[str, Any], filepath: str):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
+def load_daemon_state(path: str) -> Optional[Dict[str, Any]]:
+    """Загрузка снимка состояния предыдущего опроса демона. None, если снимка ещё нет."""
+    p = Path(path)
+    if not p.exists():
+        return None
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def save_daemon_state(path: str, state: Dict[str, Any]):
+    """Сохранение снимка состояния для сравнения на следующем опросе."""
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(state, f, ensure_ascii=False, indent=2)
+
+
 def send_telegram_message(token: str, chat_id: str, text: str) -> bool:
     """Отправка сообщения через Telegram Bot API (stdlib, без внешних зависимостей)."""
     import urllib.request
