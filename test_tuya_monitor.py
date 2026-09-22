@@ -8,11 +8,11 @@ def test_apply_dps_to_device():
     dev = {"voltage_v": 220.0, "current_a": 0.0, "power_w": 0.0,
            "temperature_c": 30, "state": "OFF", "rated_current_a": 16}
     dps = {
-        "switch_1": True,
+        "switch": True,
         "cur_voltage": 2199,   # 219.9 В
         "cur_current": 987,    # 0.987 А
         "cur_power": 1701,     # 170.1 Вт
-        "temp_current": 39,
+        "temp_value": 39,
     }
     updated = apply_dps_to_device(dev, dps)
     assert updated is True
