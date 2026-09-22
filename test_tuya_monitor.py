@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Минимальные assert-проверки для tuya_monitor.py (без фреймворков)."""
 
-from tuya_monitor import PhaseAnalyzer, apply_dps_to_device
+from tuya_monitor import PhaseAnalyzer, apply_dps_to_device, build_state_snapshot, build_change_message
 
 
 def test_apply_dps_to_device():
@@ -51,8 +51,52 @@ def test_phase_analyzer_evaluate_detects_imbalance():
     assert any("Токовая перегрузка" in a["message"] for a in critical_alerts)
 
 
+def test_build_state_snapshot():
+    schema = {
+        "devices": [
+            {"id": "L1-01", "name": "Котёл", "phase": "L1", "state": "ON",
+             "category": "heating", "rated_current_a": 16, "current_a": 0.0,
+             "power_w": 0.0, "temperature_c": 30, "voltage_v": 210.0},
+            {"id": "L3-01", "name": "Плита", "phase": "L3", "state": "OFF",
+             "category": "kitchen", "rated_current_a": 16, "current_a": 0.0,
+             "power_w": 0.0, "temperature_c": 30, "voltage_v": 210.0},
+        ]
+    }
+    analysis = PhaseAnalyzer.evaluate(schema)
+    snap = build_state_snapshot(schema, analysis)
+    assert snap["device_states"] == {"L1-01": "ON", "L3-01": "OFF"}
+    assert snap["risk_level"] in ("LOW", "MEDIUM", "HIGH")
+    assert isinstance(snap["alert_keys"], list)
+
+
+def test_build_change_message_detects_breaker_toggle():
+    schema = {"devices": [{"id": "L1-01", "name": "Котёл", "phase": "L1", "state": "ON",
+                            "category": "heating", "rated_current_a": 16, "current_a": 0.0,
+                            "power_w": 0.0, "temperature_c": 30, "voltage_v": 210.0}]}
+    analysis = PhaseAnalyzer.evaluate(schema)
+    old_state = {"device_states": {"L1-01": "OFF"}, "alert_keys": [], "risk_level": "LOW"}
+    new_state = build_state_snapshot(schema, analysis)
+    msg = build_change_message(schema, analysis, old_state, new_state)
+    assert msg is not None
+    assert "Котёл" in msg
+    assert "OFF" in msg and "ON" in msg
+
+
+def test_build_change_message_no_change_returns_none():
+    schema = {"devices": [{"id": "L1-01", "name": "Котёл", "phase": "L1", "state": "ON",
+                            "category": "heating", "rated_current_a": 16, "current_a": 0.0,
+                            "power_w": 0.0, "temperature_c": 30, "voltage_v": 210.0}]}
+    analysis = PhaseAnalyzer.evaluate(schema)
+    state = build_state_snapshot(schema, analysis)
+    msg = build_change_message(schema, analysis, state, state)
+    assert msg is None
+
+
 if __name__ == "__main__":
     test_apply_dps_to_device()
     test_apply_dps_to_device_no_known_codes()
     test_phase_analyzer_evaluate_detects_imbalance()
+    test_build_state_snapshot()
+    test_build_change_message_detects_breaker_toggle()
+    test_build_change_message_no_change_returns_none()
     print("OK: все проверки tuya_monitor.py прошли")

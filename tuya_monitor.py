@@ -434,6 +434,73 @@ def send_telegram_message(token: str, chat_id: str, text: str) -> bool:
         return False
 
 
+def build_state_snapshot(schema: Dict[str, Any], analysis: Dict[str, Any]) -> Dict[str, Any]:
+    """Компактный снимок состояния щита для сравнения между опросами демона."""
+    device_states = {
+        dev["id"]: dev.get("state", "ON")
+        for dev in schema.get("devices", [])
+        if "id" in dev
+    }
+    alert_keys = sorted(
+        f"{a['level']}|{a['device']}|{a['message']}" for a in analysis["alerts"]
+    )
+    risk_level = (
+        "HIGH" if analysis["voltage_spread_v"] >= 15
+        else "MEDIUM" if analysis["voltage_spread_v"] >= 8
+        else "LOW"
+    )
+    return {
+        "device_states": device_states,
+        "alert_keys": alert_keys,
+        "risk_level": risk_level,
+    }
+
+
+def build_change_message(schema: Dict[str, Any], analysis: Dict[str, Any],
+                          old_state: Dict[str, Any], new_state: Dict[str, Any]) -> Optional[str]:
+    """Формирует текст Telegram-сообщения по разнице между двумя снимками состояния.
+    Возвращает None, если ничего значимого не изменилось."""
+    names_by_id = {dev["id"]: dev["name"] for dev in schema.get("devices", []) if "id" in dev}
+    lines: List[str] = []
+
+    old_devs = old_state.get("device_states", {})
+    new_devs = new_state.get("device_states", {})
+    for dev_id, new_st in new_devs.items():
+        old_st = old_devs.get(dev_id)
+        if old_st is not None and old_st != new_st:
+            name = names_by_id.get(dev_id, dev_id)
+            lines.append(f"🔌 {name}: {old_st} → {new_st}")
+
+    old_alerts = set(old_state.get("alert_keys", []))
+    new_alerts = set(new_state.get("alert_keys", []))
+    for key in sorted(new_alerts - old_alerts):
+        level, device, message = key.split("|", 2)
+        icon = "🔴" if level == "CRITICAL" else "🟡"
+        lines.append(f"{icon} НОВЫЙ АЛЕРТ [{device}]: {message}")
+    for key in sorted(old_alerts - new_alerts):
+        level, device, message = key.split("|", 2)
+        lines.append(f"✅ Устранено [{device}]: {message}")
+
+    if old_state.get("risk_level") != new_state.get("risk_level"):
+        lines.append(f"⚖️ Риск перекоса фаз: {old_state.get('risk_level')} → {new_state.get('risk_level')}")
+
+    if not lines:
+        return None
+
+    summary = analysis["phase_summary"]
+    busiest = max(summary, key=lambda ph: summary[ph]["total_current"])
+    idlest = min(summary, key=lambda ph: summary[ph]["total_current"])
+    lines.append("")
+    lines.append(
+        f"📊 Токи: L1={summary['L1']['total_current']:.2f}A, "
+        f"L2={summary['L2']['total_current']:.2f}A, L3={summary['L3']['total_current']:.2f}A"
+    )
+    if busiest != idlest and summary[busiest]["total_current"] - summary[idlest]["total_current"] >= 3.0:
+        lines.append(f"💡 Рекомендация: перенести часть нагрузки с {busiest} на {idlest} для баланса фаз.")
+
+    return "\n".join(lines)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Tuya Home Electrical Monitoring & Imbalance Analyzer")
     parser.add_argument("--schema", default="schema_data.json", help="Путь к файлу schema_data.json")
