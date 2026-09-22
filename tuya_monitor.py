@@ -545,6 +545,14 @@ def main():
     client_secret = os.environ.get("TUYA_API_SECRET")
     region = os.environ.get("TUYA_REGION", "eu")
 
+    # Проверка переменных окружения Telegram (опционально — без них диагностика просто не шлётся)
+    telegram_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    telegram_chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+    if not (telegram_token and telegram_chat_id):
+        print(f"{Colors.YELLOW}[INFO] TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID не заданы — уведомления отключены.{Colors.RESET}")
+
+    state_path = os.path.join(os.path.dirname(os.path.abspath(schema_path)), ".electro_daemon_state.json")
+
     use_live_api = bool(client_id and client_secret and not args.mock)
     client: Optional[TuyaCloudClient] = None
 
@@ -577,6 +585,17 @@ def main():
             sync_summary_into_schema(schema, analysis)
             save_schema(schema, args.export)
             print(f"[EXPORT] Данные сохранены в {args.export}")
+
+        new_state = build_state_snapshot(schema, analysis)
+        old_state = load_daemon_state(state_path)
+        if old_state is not None:
+            message = build_change_message(schema, analysis, old_state, new_state)
+            if message:
+                print(f"{Colors.CYAN}[DIAGNOSIS] Обнаружены изменения:{Colors.RESET}\n{message}")
+                if telegram_token and telegram_chat_id:
+                    if send_telegram_message(telegram_token, telegram_chat_id, message):
+                        print(f"{Colors.CYAN}[TELEGRAM] Уведомление отправлено{Colors.RESET}")
+        save_daemon_state(state_path, new_state)
 
         if not args.daemon:
             break
