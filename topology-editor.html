@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Редактор топологии щита (локально, не для прода)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { background:#0f172a; }
+  .card { touch-action: none; }
+  .card.dragging { opacity: 0.4; }
+  .lane.dragover { outline: 2px dashed #6366f1; outline-offset: -4px; }
+</style>
+</head>
+<body class="text-slate-200 font-sans p-6">
+
+  <div class="max-w-7xl mx-auto space-y-5">
+    <div>
+      <h1 class="text-xl font-bold text-white">Редактор топологии щита — черновик, только локально</h1>
+      <p class="text-sm text-slate-400">
+        Перетаскивай автоматы мышкой между фазами и меняй порядок внутри фазы —
+        так, как реально подключено. Это НЕ трогает прод и schema_data.json.
+        Когда закончишь — жми «Экспорт JSON», покажешь мне файл, вместе решим что катить на прод.
+      </p>
+      <p id="load-status" class="text-xs text-amber-400 mt-1"></p>
+    </div>
+
+    <div class="flex flex-wrap gap-3">
+      <button onclick="resetLayout()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm">
+        ↺ Сбросить к исходному (schema_data.json)
+      </button>
+      <button onclick="exportJSON()" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold">
+        ⬇ Экспорт JSON
+      </button>
+      <span class="text-xs text-slate-500 self-center">Позиции также сохраняются в localStorage браузера — переживут перезагрузку страницы.</span>
+    </div>
+
+    <!-- Уличный щиток — свой уровень выше основного щитка, без телеметрии -->
+    <div class="rounded-xl border border-sky-500/40 bg-sky-950/20 p-3 max-w-md">
+      <div class="flex items-center justify-between mb-2">
+        <span class="font-bold text-sky-300 text-sm">🏠 Уличный щиток</span>
+        <button onclick="addOutdoorBreaker()" class="text-xs px-2 py-1 rounded bg-sky-600 hover:bg-sky-500 text-white">+ автомат</button>
+      </div>
+      <div id="outdoor-list" class="space-y-1.5" ondragover="onOutdoorDragOver(event)" ondrop="onOutdoorDrop(event)"></div>
+      <p class="text-[10px] text-slate-500 mt-1">Свои узлы, без Tuya-телеметрии — просто чтобы отметить порядок.</p>
+    </div>
+    <div class="flex justify-center text-slate-600">↓</div>
+
+    <!-- Неподвижные узлы верхнего уровня, просто для контекста -->
+    <div id="fixed-nodes" class="flex flex-wrap gap-2 text-xs text-slate-400"></div>
+
+    <div id="lanes" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <!-- Генерируется через JS -->
+    </div>
+  </div>
+
+<script>
+  const PHASES = ['L1', 'L2', 'L3'];
+  const PHASE_STYLE = {
+    L1: { text: 'text-rose-300', border: 'border-rose-500/40', bg: 'bg-rose-950/20' },
+    L2: { text: 'text-emerald-300', border: 'border-emerald-500/40', bg: 'bg-emerald-950/20' },
+    L3: { text: 'text-violet-300', border: 'border-violet-500/40', bg: 'bg-violet-950/20' },
+  };
+  const STORAGE_KEY = 'topology-editor-layout-v1';
+  const OUTDOOR_STORAGE_KEY = 'topology-editor-outdoor-v1';
+
+  let originalDevices = [];   // как есть в schema_data.json
+  let layout = { L1: [], L2: [], L3: [] };  // id -> порядок внутри фазы, сейчас
+  let outdoorBreakers = [];   // [{id, name}] — свои узлы без телеметрии, уличный щиток
+
+  async function loadData() {
+    const status = document.getElementById('load-status');
+    try {
+      const resp = await fetch('schema_data.json?t=' + Date.now(), { cache: 'no-store' });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const data = await resp.json();
+      originalDevices = data.devices || [];
+      status.textContent = 'Загружено ' + originalDevices.length + ' устройств из schema_data.json (обновлено ' + (data.updated_at || '?') + ')';
+
+      renderFixedNodes(data.devices);
+
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          layout = JSON.parse(saved);
+          status.textContent += ' • восстановлена сохранённая раскладка из localStorage';
+        } catch (e) {
+          buildLayoutFromOriginal();
+        }
+      } else {
+        buildLayoutFromOriginal();
+      }
+    } catch (e) {
+      status.textContent = 'Не удалось загрузить schema_data.json: ' + e.message +
+        '. Открой файл через локальный сервер (например: python3 -m http.server), не через file://';
+      status.className = 'text-xs text-rose-400 mt-1';
+      return;
+    }
+
+    const savedOutdoor = localStorage.getItem(OUTDOOR_STORAGE_KEY);
+    outdoorBreakers = savedOutdoor ? JSON.parse(savedOutdoor) : [];
+    renderOutdoor();
+    renderLanes();
+  }
+
+  function renderFixedNodes(devices) {
+    const main = devices.find(d => d.category === 'input');
+    const rcd = devices.find(d => d.category === 'protection' && d.phase === '3P');
+    const box = document.getElementById('fixed-nodes');
+    box.innerHTML = [main, rcd].filter(Boolean).map(d =>
+      `<span class="px-2.5 py-1 rounded bg-slate-800 border border-slate-700">${d.name}</span>`
+    ).join('<span class="self-center">→</span>');
+  }
+
+  function buildLayoutFromOriginal() {
+    layout = { L1: [], L2: [], L3: [] };
+    const breakers = originalDevices
+      .filter(d => d.category !== 'protection' && d.category !== 'input')
+      .sort((a, b) => (a.din_rail - b.din_rail) || (a.din_position - b.din_position));
+    breakers.forEach(d => {
+      if (layout[d.phase]) layout[d.phase].push(d.id);
+    });
+  }
+
+  function deviceById(id) {
+    return originalDevices.find(d => d.id === id);
+  }
+
+  function renderLanes() {
+    const lanesEl = document.getElementById('lanes');
+    lanesEl.innerHTML = PHASES.map(ph => {
+      const st = PHASE_STYLE[ph];
+      const relay = originalDevices.find(d => d.category === 'protection' && d.phase === ph);
+      return `
+        <div class="lane rounded-xl border ${st.border} ${st.bg} p-3 min-h-[200px]" data-phase="${ph}"
+             ondragover="onLaneDragOver(event)" ondrop="onLaneDrop(event)" ondragleave="onLaneDragLeave(event)">
+          <div class="font-bold ${st.text} text-sm mb-2">РКН ${ph}${relay ? ' • ' + relay.voltage_v.toFixed(1) + 'В' : ''}</div>
+          <div class="space-y-1.5" data-lane-list="${ph}"></div>
+        </div>`;
+    }).join('');
+
+    PHASES.forEach(ph => {
+      const list = lanesEl.querySelector(`[data-lane-list="${ph}"]`);
+      layout[ph].forEach(id => {
+        const dev = deviceById(id);
+        if (dev) list.appendChild(makeCard(dev, ph));
+      });
+    });
+  }
+
+  function makeCard(dev, currentLane) {
+    const el = document.createElement('div');
+    el.className = 'card flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-slate-800/90 border border-slate-700 cursor-grab text-xs';
+    el.draggable = true;
+    el.dataset.id = dev.id;
+    const dot = dev.state === 'OFF' ? 'bg-slate-600' : 'bg-emerald-400';
+    const moved = currentLane !== dev.phase;
+    el.innerHTML = `
+      <span class="flex items-center gap-2 min-w-0">
+        <span class="w-2 h-2 rounded-full ${dot} flex-shrink-0"></span>
+        <span class="truncate font-medium text-slate-200" title="${dev.name}">${dev.name}</span>
+      </span>
+      <span class="text-[10px] text-slate-500 font-mono flex-shrink-0">${moved ? '⚠ было ' + dev.phase + ' ' : ''}${dev.id}</span>
+    `;
+    el.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('text/plain', dev.id);
+      el.classList.add('dragging');
+    });
+    el.addEventListener('dragend', () => el.classList.remove('dragging'));
+    return el;
+  }
+
+  function onLaneDragOver(e) {
+    e.preventDefault();
+    e.currentTarget.classList.add('dragover');
+    const list = e.currentTarget.querySelector('[data-lane-list]');
+    const dragging = document.querySelector('.card.dragging');
+    if (!dragging) return;
+    const afterEl = [...list.querySelectorAll('.card:not(.dragging)')].find(card => {
+      const rect = card.getBoundingClientRect();
+      return e.clientY < rect.top + rect.height / 2;
+    });
+    if (afterEl) list.insertBefore(dragging, afterEl);
+    else list.appendChild(dragging);
+  }
+
+  function onLaneDragLeave(e) {
+    if (e.currentTarget === e.target) e.currentTarget.classList.remove('dragover');
+  }
+
+  function onLaneDrop(e) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('dragover');
+    syncLayoutFromDOM();
+    saveToStorage();
+    renderLanes();
+  }
+
+  function syncLayoutFromDOM() {
+    const newLayout = { L1: [], L2: [], L3: [] };
+    PHASES.forEach(ph => {
+      document.querySelectorAll(`[data-lane-list="${ph}"] .card`).forEach(card => {
+        newLayout[ph].push(card.dataset.id);
+      });
+    });
+    layout = newLayout;
+  }
+
+  function saveToStorage() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(layout));
+  }
+
+  function resetLayout() {
+    localStorage.removeItem(STORAGE_KEY);
+    buildLayoutFromOriginal();
+    renderLanes();
+  }
+
+  function saveOutdoor() {
+    localStorage.setItem(OUTDOOR_STORAGE_KEY, JSON.stringify(outdoorBreakers));
+  }
+
+  function addOutdoorBreaker() {
+    const name = prompt('Название автомата на уличном щитке:');
+    if (!name) return;
+    outdoorBreakers.push({ id: 'outdoor-' + Date.now(), name: name.trim() });
+    saveOutdoor();
+    renderOutdoor();
+  }
+
+  function renameOutdoorBreaker(id) {
+    const item = outdoorBreakers.find(b => b.id === id);
+    if (!item) return;
+    const name = prompt('Новое название:', item.name);
+    if (!name) return;
+    item.name = name.trim();
+    saveOutdoor();
+    renderOutdoor();
+  }
+
+  function removeOutdoorBreaker(id) {
+    outdoorBreakers = outdoorBreakers.filter(b => b.id !== id);
+    saveOutdoor();
+    renderOutdoor();
+  }
+
+  function renderOutdoor() {
+    const list = document.getElementById('outdoor-list');
+    list.innerHTML = '';
+    outdoorBreakers.forEach(b => {
+      const el = document.createElement('div');
+      el.className = 'card flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-slate-800/90 border border-sky-700/50 cursor-grab text-xs';
+      el.draggable = true;
+      el.dataset.id = b.id;
+      el.innerHTML = `
+        <span class="truncate font-medium text-slate-200">${b.name}</span>
+        <span class="flex items-center gap-1 flex-shrink-0">
+          <button class="text-slate-500 hover:text-slate-300 px-1" title="Переименовать">✎</button>
+          <button class="text-slate-500 hover:text-rose-400 px-1" title="Удалить">×</button>
+        </span>`;
+      el.querySelector('[title="Переименовать"]').onclick = () => renameOutdoorBreaker(b.id);
+      el.querySelector('[title="Удалить"]').onclick = () => removeOutdoorBreaker(b.id);
+      el.addEventListener('dragstart', () => el.classList.add('dragging'));
+      el.addEventListener('dragend', () => el.classList.remove('dragging'));
+      list.appendChild(el);
+    });
+    if (!outdoorBreakers.length) {
+      list.innerHTML = '<p class="text-xs text-slate-600 italic">Пусто — жми «+ автомат»</p>';
+    }
+  }
+
+  function onOutdoorDragOver(e) {
+    e.preventDefault();
+    const list = document.getElementById('outdoor-list');
+    const dragging = document.querySelector('.card.dragging');
+    if (!dragging) return;
+    const afterEl = [...list.querySelectorAll('.card:not(.dragging)')].find(card => {
+      const rect = card.getBoundingClientRect();
+      return e.clientY < rect.top + rect.height / 2;
+    });
+    if (afterEl) list.insertBefore(dragging, afterEl);
+    else list.appendChild(dragging);
+  }
+
+  function onOutdoorDrop(e) {
+    e.preventDefault();
+    const list = document.getElementById('outdoor-list');
+    const newOrder = [...list.querySelectorAll('.card')].map(c => c.dataset.id);
+    outdoorBreakers.sort((a, b) => newOrder.indexOf(a.id) - newOrder.indexOf(b.id));
+    saveOutdoor();
+  }
+
+  function exportJSON() {
+    syncLayoutFromDOM();
+    saveToStorage();
+
+    const breakers = [];
+    PHASES.forEach(ph => {
+      layout[ph].forEach((id, idx) => {
+        const dev = deviceById(id);
+        breakers.push({
+          id: dev.id,
+          name: dev.name,
+          old_phase: dev.phase,
+          new_phase: ph,
+          new_order_in_phase: idx + 1,
+          changed: dev.phase !== ph,
+        });
+      });
+    });
+
+    const result = {
+      outdoor_panel: outdoorBreakers.map((b, idx) => ({ name: b.name, order: idx + 1 })),
+      main_panel_breakers: breakers,
+    };
+
+    const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'topology-edit-' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  loadData();
+</script>
+</body>
+</html>
