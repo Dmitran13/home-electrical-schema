@@ -411,10 +411,13 @@ def load_local_schema(filepath: str) -> Dict[str, Any]:
 
 
 def save_schema(data: Dict[str, Any], filepath: str):
-    """Сохранение обновленной схемы в JSON файл."""
+    """Сохранение обновленной схемы в JSON файл (атомарно — во избежание гонки между
+    ручным 'Обновить' и фоновым демоном, которые теперь могут писать в один файл)."""
     data["updated_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    with open(filepath, "w", encoding="utf-8") as f:
+    tmp_path = f"{filepath}.tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp_path, filepath)
 
 
 def load_daemon_state(path: str) -> Optional[Dict[str, Any]]:
