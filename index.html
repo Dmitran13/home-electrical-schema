@@ -290,6 +290,19 @@
       </div>
     </div>
 
+    <!-- Топология подключения: кто к кому последовательно подключён -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+      <div>
+        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-diagram-project text-sky-400"></i> Топология подключения
+        </h2>
+        <p class="text-xs text-slate-400">Ввод → QF1 → QD1 → фазные шины → РКН → автоматы. Строится из реальных данных, кликабельно.</p>
+      </div>
+      <div id="topology-container" class="overflow-x-auto">
+        <!-- Генерируется через JS -->
+      </div>
+    </div>
+
     <!-- Рекомендации по перебалансировке нагрузки -->
     <div id="rebalance-section" class="bg-gradient-to-br from-slate-900 to-indigo-950/40 border border-indigo-500/30 rounded-2xl p-6 shadow-2xl space-y-5">
       <div class="flex items-center gap-3">
@@ -544,6 +557,7 @@
 
       updateDeviceCounts();
       renderDevices();
+      renderTopology();
       renderCharts(isRebalanced);
     }
 
@@ -584,6 +598,83 @@
         }
       });
       renderDevices();
+    }
+
+    const PHASE_STYLE = {
+      L1: { text: 'text-rose-300', border: 'border-rose-500/40', bg: 'bg-rose-500/10', dot: 'bg-rose-500' },
+      L2: { text: 'text-emerald-300', border: 'border-emerald-500/40', bg: 'bg-emerald-500/10', dot: 'bg-emerald-500' },
+      L3: { text: 'text-violet-300', border: 'border-violet-500/40', bg: 'bg-violet-500/10', dot: 'bg-violet-500' },
+    };
+
+    function topoLine(short) {
+      return `<div class="w-0.5 ${short ? 'h-3' : 'h-5'} bg-slate-700"></div>`;
+    }
+
+    function renderTopology() {
+      const container = document.getElementById('topology-container');
+      if (!container || !rawData) return;
+
+      const gs = rawData.grid_specifications || {};
+      const devices = rawData.devices;
+      const relayByPhase = ph => devices.find(d => d.category === 'protection' && d.phase === ph);
+      const mainBreaker = devices.find(d => d.category === 'input');
+      const rcd = devices.find(d => d.category === 'protection' && d.phase === '3P');
+
+      const breakerNode = dev => {
+        const st = PHASE_STYLE[dev.phase] || PHASE_STYLE.L1;
+        const isOff = dev.state === 'OFF';
+        const isCritical = dev.alert_level === 'critical';
+        const isWarning = dev.alert_level === 'warning' || dev.temperature_c >= 42;
+        const dot = isOff ? 'bg-slate-600' : (isCritical ? 'bg-rose-500 alert-pulse' : (isWarning ? 'bg-amber-400' : 'bg-emerald-400'));
+        return `
+          <div data-topo-dev-id="${dev.id}" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700 hover:border-indigo-500/60 cursor-pointer text-xs whitespace-nowrap">
+            <span class="w-2 h-2 rounded-full ${dot} flex-shrink-0"></span>
+            <span class="font-medium text-slate-200 truncate max-w-[140px]" title="${dev.name}">${dev.name}</span>
+            <span class="text-[10px] text-slate-500 font-mono">${dev.current_a.toFixed(2)}A</span>
+          </div>`;
+      };
+
+      const phaseColumn = ph => {
+        const st = PHASE_STYLE[ph];
+        const relay = relayByPhase(ph);
+        const breakers = devices
+          .filter(d => d.phase === ph && d.category !== 'protection')
+          .sort((a, b) => (a.din_rail - b.din_rail) || (a.din_position - b.din_position));
+        return `
+          <div class="flex flex-col items-center min-w-[180px]">
+            ${topoLine(true)}
+            <div class="px-3 py-1.5 rounded-lg ${st.bg} border ${st.border} ${st.text} text-xs font-bold whitespace-nowrap">
+              РКН ${ph}${relay ? ` • ${relay.voltage_v.toFixed(1)}В` : ''}
+            </div>
+            ${topoLine(true)}
+            <div class="flex flex-col gap-1.5 border-l-2 ${st.border} pl-3 pb-1">
+              ${breakers.map(breakerNode).join('')}
+            </div>
+          </div>`;
+      };
+
+      container.innerHTML = `
+        <div class="flex flex-col items-center py-2">
+          <div class="px-4 py-2 rounded-xl bg-slate-800 border border-slate-600 text-center">
+            <div class="text-xs font-bold text-white">${gs.system_type || 'Ввод'}</div>
+            <div class="text-[10px] text-slate-400 font-mono">${gs.nominal_voltage || ''} • ${gs.allocated_power_kw || '?'} кВт</div>
+          </div>
+          ${topoLine()}
+          ${mainBreaker ? `<div class="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-500 text-xs font-bold text-white whitespace-nowrap">${mainBreaker.name}</div>` : ''}
+          ${topoLine()}
+          ${rcd ? `<div class="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-500 text-xs font-bold text-white whitespace-nowrap">${rcd.name}</div>` : ''}
+          ${topoLine()}
+          <div class="flex flex-wrap justify-center gap-6 pt-1">
+            ${PHASES.map(phaseColumn).join('')}
+          </div>
+        </div>`;
+
+      container.querySelectorAll('[data-topo-dev-id]').forEach(el => {
+        el.addEventListener('click', () => {
+          const dev = rawData.devices.find(d => d.id === el.dataset.topoDevId);
+          if (dev) openModal(dev);
+        });
+      });
     }
 
     function updateDeviceCounts() {
