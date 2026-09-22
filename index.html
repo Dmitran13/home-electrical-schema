@@ -54,7 +54,7 @@
               <i class="fa-solid fa-triangle-exclamation mr-1"></i>ДИСБАЛАНС НАГРУЗКИ
             </span>
           </h1>
-          <p class="text-xs text-slate-400">Ввод 380/220V 15 кВт • 33 устройства (Tuya SY2) • Dmitran13</p>
+          <p class="text-xs text-slate-400">Ввод 380/220V 15 кВт • <span id="header-device-count">33</span> устройства (Tuya SY2) • Dmitran13</p>
         </div>
       </div>
 
@@ -271,16 +271,16 @@
           <h2 class="text-lg font-bold text-white flex items-center gap-2">
             <i class="fa-solid fa-server text-amber-400"></i> Схема распределительного щита (DIN-рейки)
           </h2>
-          <p class="text-xs text-slate-400">33 модульных устройства • Кликните на автомат для детального анализа линии</p>
+          <p class="text-xs text-slate-400"><span id="grid-device-count">33</span> модульных устройства • Кликните на автомат для детального анализа линии</p>
         </div>
 
         <!-- Фильтры -->
         <div class="flex flex-wrap gap-2 text-xs">
-          <button onclick="filterDevices('all')" id="flt-all" class="px-3 py-1 rounded-lg bg-indigo-600 text-white font-medium">Все (33)</button>
-          <button onclick="filterDevices('L1')" id="flt-l1" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-rose-300 border border-rose-500/30">Фаза 1 (8)</button>
-          <button onclick="filterDevices('L2')" id="flt-l2" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/30">Фаза 2 (19)</button>
-          <button onclick="filterDevices('L3')" id="flt-l3" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-violet-300 border border-violet-500/30">Фаза 3 (4)</button>
-          <button onclick="filterDevices('alerts')" id="flt-alerts" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30">⚠️ Тревоги (5)</button>
+          <button onclick="filterDevices('all')" id="flt-all" class="px-3 py-1 rounded-lg bg-indigo-600 text-white font-medium">Все (<span id="flt-all-count">33</span>)</button>
+          <button onclick="filterDevices('L1')" id="flt-l1" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-rose-300 border border-rose-500/30">Фаза 1 (<span id="flt-l1-count">8</span>)</button>
+          <button onclick="filterDevices('L2')" id="flt-l2" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/30">Фаза 2 (<span id="flt-l2-count">19</span>)</button>
+          <button onclick="filterDevices('L3')" id="flt-l3" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-violet-300 border border-violet-500/30">Фаза 3 (<span id="flt-l3-count">4</span>)</button>
+          <button onclick="filterDevices('alerts')" id="flt-alerts" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30">⚠️ Тревоги (<span id="flt-alerts-count">5</span>)</button>
         </div>
       </div>
 
@@ -542,6 +542,7 @@
       const metricsSource = isRebalanced ? rawData.rebalanced_plan.phase_metrics : rawData.phase_metrics;
       PHASES.forEach(ph => applyPhaseCard(ph, metricsSource[ph], isRebalanced));
 
+      updateDeviceCounts();
       renderDevices();
       renderCharts(isRebalanced);
     }
@@ -583,6 +584,21 @@
         }
       });
       renderDevices();
+    }
+
+    function updateDeviceCounts() {
+      const devices = rawData.devices;
+      const total = devices.length;
+      const byPhase = ph => devices.filter(d => d.phase === ph).length;
+      const alerts = devices.filter(d => d.alert_level === 'critical' || d.alert_level === 'warning' || d.temperature_c >= 42).length;
+
+      document.getElementById('header-device-count').textContent = total;
+      document.getElementById('grid-device-count').textContent = total;
+      document.getElementById('flt-all-count').textContent = total;
+      document.getElementById('flt-l1-count').textContent = byPhase('L1');
+      document.getElementById('flt-l2-count').textContent = byPhase('L2');
+      document.getElementById('flt-l3-count').textContent = byPhase('L3');
+      document.getElementById('flt-alerts-count').textContent = alerts;
     }
 
     function renderDevices() {
