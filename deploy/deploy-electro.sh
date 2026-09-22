@@ -38,9 +38,26 @@ ssh "$SERVER" "
   fi
 "
 
+echo "=== Ключи Telegram-бота (.env на сервере) ==="
+ssh "$SERVER" "
+  if ! grep -q '^TELEGRAM_BOT_TOKEN=' '$DEPLOY_DIR/.env' 2>/dev/null; then
+    echo '  ВНИМАНИЕ: TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID не найдены в .env — добавьте вручную:'
+    echo '  cat >> $DEPLOY_DIR/.env <<ENVEOF'
+    echo '  TELEGRAM_BOT_TOKEN=...'
+    echo '  TELEGRAM_CHAT_ID=...'
+    echo '  ENVEOF'
+  else
+    echo '  TELEGRAM_BOT_TOKEN уже есть в .env — не трогаем'
+  fi
+"
+
 echo "=== systemd-сервис бэкенда (electro-refresh) ==="
 scp "$SCRIPT_DIR/electro-refresh.service" "$SERVER:/etc/systemd/system/electro-refresh.service"
 ssh "$SERVER" "systemctl daemon-reload && systemctl enable --now electro-refresh"
+
+echo "=== systemd-сервис автономной диагностики (electro-daemon) ==="
+scp "$SCRIPT_DIR/electro-daemon.service" "$SERVER:/etc/systemd/system/electro-daemon.service"
+ssh "$SERVER" "systemctl daemon-reload && systemctl enable --now electro-daemon"
 
 echo "=== Пароль доступа (basic-auth) ==="
 ssh "$SERVER" "
