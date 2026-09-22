@@ -588,6 +588,7 @@ def main():
 
         new_state = build_state_snapshot(schema, analysis)
         old_state = load_daemon_state(state_path)
+        should_save_state = True
         if old_state is not None:
             message = build_change_message(schema, analysis, old_state, new_state)
             if message:
@@ -595,7 +596,11 @@ def main():
                 if telegram_token and telegram_chat_id:
                     if send_telegram_message(telegram_token, telegram_chat_id, message):
                         print(f"{Colors.CYAN}[TELEGRAM] Уведомление отправлено{Colors.RESET}")
-        save_daemon_state(state_path, new_state)
+                    else:
+                        # Не фиксируем снимок — иначе изменение потеряется из следующего сравнения
+                        should_save_state = False
+        if should_save_state:
+            save_daemon_state(state_path, new_state)
 
         if not args.daemon:
             break
