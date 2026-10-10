@@ -461,7 +461,10 @@
       const isRebalanced = (currentMode === 'rebalanced');
       const alertBox = document.getElementById('imbalance-alert-box');
       const headerBadge = document.getElementById('header-badge');
-      const riskLevel = isRebalanced ? 'LOW' : (rawData.asymmetry_analysis.risk_level || 'HIGH');
+      const spreadFor = level => level >= 15 ? 'HIGH' : (level >= 8 ? 'MEDIUM' : 'LOW');
+      const riskLevel = isRebalanced
+        ? spreadFor(rawData.rebalanced_plan.asymmetry.phase_voltage_spread_v)
+        : (rawData.asymmetry_analysis.risk_level || 'HIGH');
       if (riskLevel === 'LOW') {
         headerBadge.className = 'text-xs font-mono font-normal px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
         headerBadge.innerHTML = '<i class="fa-solid fa-check mr-1"></i>ФАЗЫ СБАЛАНСИРОВАНЫ';
@@ -474,23 +477,25 @@
       }
 
       if (isRebalanced) {
-        const spread = rawData.rebalanced_plan.asymmetry.phase_voltage_spread_v.toFixed(1);
+        const rb = rawData.rebalanced_plan;
+        const spread = rb.asymmetry.phase_voltage_spread_v.toFixed(1);
+        const rm = rb.phase_metrics;
+        const uLine = PHASES.map(ph => `${ph}: ${rm[ph].voltage_avg_v.toFixed(1)}В`).join(', ');
+        const stillImbalanced = riskLevel !== 'LOW';
         alertBox.className = "bg-gradient-to-r from-emerald-950/70 via-slate-900 to-teal-950/70 border border-emerald-600/40 rounded-2xl p-5 shadow-2xl relative overflow-hidden";
         alertBox.innerHTML = `
           <div class="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div class="space-y-1">
               <div class="flex items-center gap-2">
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-600 text-white">
-                  СИМУЛЯЦИЯ: БАЛАНСИРОВКА ВЫПОЛНЕНА
+                  СИМУЛЯЦИЯ: ${stillImbalanced ? 'ЧАСТИЧНАЯ БАЛАНСИРОВКА' : 'БАЛАНСИРОВКА ВЫПОЛНЕНА'}
                 </span>
-                <span class="text-xs text-slate-400 font-mono">ΔU = ${spread} В • Токи сбалансированы (~5-7А)</span>
+                <span class="text-xs text-slate-400 font-mono">ΔU = ${spread} В (было ${rawData.asymmetry_analysis.phase_voltage_spread_v.toFixed(1)} В)</span>
               </div>
-              <h2 class="text-base sm:text-lg font-bold text-white">
-                ТЭН котла перенесен на Фазу 3, Бойлер ГВС — на Фазу 1
-              </h2>
+              <h2 class="text-base sm:text-lg font-bold text-white">${rb.description}</h2>
               <p class="text-xs text-slate-300 max-w-3xl">
-                Напряжение выровнялось на всех трех фазах (L1: 223В, L2: 221В, L3: 225В). Смещение нейтрали сведено к минимуму.
-                Исчез риск аварийного срабатывания РКН.
+                Напряжение по фазам после переноса: ${uLine}.
+                ${stillImbalanced ? 'Перекос снижен, но не устранён — L1 несёт единственную крупную нагрузку (котёл), её можно перенести только переразводкой проводки.' : 'Разброс сведён к минимуму.'}
               </p>
             </div>
             <button onclick="setMode('actual')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg transition">
@@ -579,15 +584,15 @@
       document.getElementById(`bar-text-${p}`).innerText = `${i}A / ${denom}A (${pct.toFixed(1)}%)`;
       document.getElementById(`bar-fill-${p}`).style.width = `${pct.toFixed(1)}%`;
       const linesEl = document.getElementById(`lines-${p}`);
-      if (linesEl) linesEl.innerText = `${m.device_count} линий`;
+      if (linesEl && m.device_count != null) linesEl.innerText = `${m.device_count} линий`;
 
       if (phase === 'L1') {
         const minEl = document.getElementById('minmax-l1');
-        if (minEl) minEl.innerText = `мин. ${m.voltage_min_v.toFixed(1)} В`;
+        if (minEl && m.voltage_min_v != null) minEl.innerText = `мин. ${m.voltage_min_v.toFixed(1)} В`;
       }
       if (phase === 'L3') {
         const maxEl = document.getElementById('minmax-l3');
-        if (maxEl) maxEl.innerText = `макс. ${m.voltage_max_v.toFixed(1)} В${m.voltage_max_v >= 240 ? '!' : ''}`;
+        if (maxEl && m.voltage_max_v != null) maxEl.innerText = `макс. ${m.voltage_max_v.toFixed(1)} В${m.voltage_max_v >= 240 ? '!' : ''}`;
       }
 
       if (phase === 'L1') {

@@ -53,31 +53,39 @@
     "phase_voltage_spread_v": 43.7,
     "current_unbalance_ratio_pct": 94.32,
     "risk_level": "HIGH",
-    "primary_cause": "Подключение котла мощностью 3.1 кВт на Фазу 1 при почти нулевой нагрузке на Фазе 3.",
-    "recommendation": "Перенести ступень электрокотла или бойлер на Фазу 3 для выравнивания токов до ~6-7А на фазу."
+    "primary_cause": "Котёл (Фаза 1, ~16А) и бойлер+скважина (Фаза 2, ~16А) нагружены почти поровну, Фаза 3 простаивает (0.6А) — весь небаланс идёт через нейтраль.",
+    "recommendation": "Перенести одну силовую линию с L1 или L2 на L3 (например «2 бойлер» 7.98А или «Бойлер» 5.9А) — это выравняет фазы до ~10-11А и снимет нейтраль с перегрузки."
   },
   "rebalanced_plan": {
-    "description": "Целевые показатели после переноса ТЭНа котла на L3 и бойлера ГВС на L1.",
+    "description": "Перенос линии «2 бойлер холод очистка скважина» (L2-01, 7.98А) с фазы L2 на L3. Напряжение — оценка по наблюдаемой зависимости U(I) на этом щите, не точный расчёт.",
     "phase_metrics": {
       "L1": {
-        "voltage_avg_v": 223.0,
-        "total_current_a": 6.2,
-        "total_power_w": 1380.0
+        "voltage_avg_v": 195.1,
+        "voltage_min_v": 186.4,
+        "voltage_max_v": 210.7,
+        "total_current_a": 15.95,
+        "total_power_w": 3360.5,
+        "device_count": 8
       },
       "L2": {
-        "voltage_avg_v": 221.0,
-        "total_current_a": 4.5,
-        "total_power_w": 990.0
+        "voltage_avg_v": 207.2,
+        "voltage_min_v": 205.2,
+        "voltage_max_v": 217.2,
+        "total_current_a": 7.67,
+        "total_power_w": 1322.3,
+        "device_count": 9
       },
       "L3": {
-        "voltage_avg_v": 224.5,
-        "total_current_a": 7.5,
-        "total_power_w": 1680.0
+        "voltage_avg_v": 205.8,
+        "voltage_min_v": 195.3,
+        "voltage_max_v": 216.3,
+        "total_current_a": 8.59,
+        "total_power_w": 1589.3,
+        "device_count": 4
       }
     },
     "asymmetry": {
-      "neutral_displacement_voltage_v": 1.5,
-      "phase_voltage_spread_v": 3.5
+      "phase_voltage_spread_v": 12.1
     }
   },
   "devices": [
@@ -206,7 +214,7 @@
       "alert_level": "warning",
       "din_rail": 1,
       "din_position": 3,
-      "notes": "Порог отключения Umin 195V (на грани)"
+      "notes": "Порог отключения Umin 195V — фаза ~196В, на грани отключения"
     },
     {
       "id": "DEV-VRELAY-L2",
@@ -224,7 +232,7 @@
       "alert_level": "normal",
       "din_rail": 1,
       "din_position": 4,
-      "notes": "Напряжение в норме"
+      "notes": "Порог отключения Umin 195V — фаза ~195В, тоже на грани отключения"
     },
     {
       "id": "DEV-VRELAY-L3",
@@ -242,7 +250,7 @@
       "alert_level": "warning",
       "din_rail": 1,
       "din_position": 5,
-      "notes": "Порог отключения Umax 250V (близко: пик 242.1В)"
+      "notes": "Порог отключения Umax 250V — фаза ~218В, запас есть"
     },
     {
       "id": "L1-01",
@@ -458,7 +466,7 @@
       "alert_level": "warning",
       "din_rail": 3,
       "din_position": 3,
-      "notes": "Внимание! Повышенная температура 43°C при минимальном токе",
+      "notes": "Внимание! Повышенная температура 44°C при минимальном токе",
       "tuya_device_id": "bfa92f1867b9adfb9d6co0",
       "temp_limit_c": 65,
       "voltage_max_limit_v": 250,
