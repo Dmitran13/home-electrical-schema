@@ -134,7 +134,6 @@
           <div>
             <div class="text-xs text-slate-400">Сумм. ток</div>
             <div id="val-i-l1" class="text-xl font-mono font-bold text-rose-400">14.99 <span class="text-xs font-normal">А</span></div>
-            <div class="text-[10px] text-slate-400">93.7% от 16А</div>
           </div>
           <div>
             <div class="text-xs text-slate-400">Мощность</div>
@@ -146,7 +145,7 @@
         <!-- Прогресс нагрузки автомата котла -->
         <div class="space-y-1">
           <div class="flex justify-between text-xs">
-            <span class="text-slate-400">Пиковый автомат (Котёл 16A):</span>
+            <span class="text-slate-400">Загрузка фазы:</span>
             <span id="bar-text-l1" class="font-mono text-rose-400 font-bold">14.99A / 16A (94%)</span>
           </div>
           <div class="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
@@ -163,7 +162,7 @@
               <span class="w-3 h-3 rounded-full bg-emerald-400"></span>
               <h3 class="font-bold text-base text-emerald-400">ФАЗА 2 (L2)</h3>
             </div>
-            <p class="text-xs text-slate-400">Кухня, бойлер, свет, спальни</p>
+            <p class="text-xs text-slate-400">Бойлер, скважина, свет, спальни</p>
           </div>
           <span class="text-xs font-bold px-2 py-1 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">НОРМА</span>
         </div>
@@ -205,7 +204,7 @@
               <span class="w-3 h-3 rounded-full bg-violet-400 alert-pulse"></span>
               <h3 class="font-bold text-base text-violet-400">ФАЗА 3 (L3)</h3>
             </div>
-            <p class="text-xs text-slate-400">Плита, духовка, розетки В</p>
+            <p class="text-xs text-slate-400">Плита, духовка, кухня, розетки В</p>
           </div>
           <span class="text-xs font-bold px-2 py-1 rounded bg-violet-500/20 text-violet-300 border border-violet-500/30">ЗАВЫШЕНО</span>
         </div>
@@ -386,7 +385,7 @@
         </div>
         <div>
           <div class="text-xs text-slate-400">Ток / Номинал:</div>
-          <div id="modal-i" class="font-mono font-bold text-white">0 A / 16 A</div>
+          <div id="modal-i" class="font-mono font-bold text-white">— A / — A</div>
         </div>
         <div>
           <div class="text-xs text-slate-400">Мощность:</div>
@@ -562,16 +561,16 @@
     }
 
     const PHASES = ['L1', 'L2', 'L3'];
-    // Знаменатель загрузки шкалы: L1 — по самому нагруженному автомату (котёл 16А),
-    // L2/L3 — по номиналу вводного автомата фазы (25А).
-    const PHASE_BAR_DENOM = { L1: 16, L2: 25, L3: 25 };
+    // Знаменатель загрузки шкалы — номинал вводного автомата (QF1) из данных:
+    // физический предел фазной шины, а не уставка отдельного автомата линии.
+    const phaseDenom = () => rawData?.grid_specifications?.input_circuit_breaker_rating_a || 25;
 
     function applyPhaseCard(phase, m, isRebalanced) {
       const p = phase.toLowerCase();
       const u = m.voltage_avg_v.toFixed(1);
       const i = m.total_current_a.toFixed(2);
       const kw = (m.total_power_w / 1000).toFixed(2);
-      const denom = PHASE_BAR_DENOM[phase];
+      const denom = phaseDenom();
       const pct = (m.total_current_a / denom * 100);
 
       document.getElementById(`val-u-${p}`).innerHTML = `${u} <span class="text-xs font-normal">В</span>`;

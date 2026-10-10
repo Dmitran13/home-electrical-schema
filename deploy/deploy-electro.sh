@@ -61,11 +61,11 @@ ssh "$SERVER" "
 
 echo "=== systemd-сервис бэкенда (electro-refresh) ==="
 scp "$SCRIPT_DIR/electro-refresh.service" "$SERVER:/etc/systemd/system/electro-refresh.service"
-ssh "$SERVER" "systemctl daemon-reload && systemctl enable --now electro-refresh"
+ssh "$SERVER" "systemctl daemon-reload && systemctl enable electro-refresh && systemctl restart electro-refresh"
 
 echo "=== systemd-сервис автономной диагностики (electro-daemon) ==="
 scp "$SCRIPT_DIR/electro-daemon.service" "$SERVER:/etc/systemd/system/electro-daemon.service"
-ssh "$SERVER" "systemctl daemon-reload && systemctl enable --now electro-daemon"
+ssh "$SERVER" "systemctl daemon-reload && systemctl enable electro-daemon && systemctl restart electro-daemon"
 
 echo "=== Пароль доступа (basic-auth) ==="
 ssh "$SERVER" "

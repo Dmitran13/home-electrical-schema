@@ -16,6 +16,7 @@ Tuya Electrical Telemetry & Phase Imbalance Monitor
 
 import os
 import sys
+import base64
 import time
 import json
 import hmac
@@ -34,7 +35,7 @@ VOLTAGE_HIGH_CRITICAL = 250.0  # В
 CURRENT_LOAD_WARN_PCT = 80.0   # % от номинала автомата
 CURRENT_LOAD_CRIT_PCT = 90.0   # % от номинала автомата
 
-TEMP_WARN_C = 42.0             # °C
+TEMP_WARN_C = 42.0             # °C — гигиенический порог нагрева корпуса (WARNING)
 TEMP_CRIT_C = 50.0             # °C
 
 # Коды DPS автоматов Tuya SY2. Проверьте реальные коды своего устройства
@@ -45,7 +46,32 @@ DPS_CODE_MAP = {
     "current": "cur_current",      # в мА
     "power": "cur_power",          # в 0.1 Вт
     "temperature": "temp_value",   # в °C
+    "alarm_set_1": "alarm_set_1",  # raw base64: уставки защиты (перегрев и т.д.)
+    "alarm_set_2": "alarm_set_2",  # raw base64: уставки защиты (ток, напряжение)
 }
+
+# Уставки защиты автомат отдаёт в raw-DPS alarm_set_1 / alarm_set_2: base64 с записями
+# по 4 байта [тип][вкл][значение hi][значение lo]. Типы проверены на реальных SY2.
+ALARM_SET_TYPES = {
+    1: "rated_current_a",        # уставка срабатывания по току, А (16 / 30 ...)
+    3: "voltage_max_limit_v",    # порог отключения по превышению напряжения, В
+    4: "voltage_min_limit_v",    # порог отключения по просадке напряжения, В
+    5: "temp_limit_c",           # порог отключения по перегреву корпуса, °C
+}
+
+
+def parse_alarm_set(b64: str) -> Dict[str, int]:
+    """Разбор raw-DPS уставок защиты. Записи с нулевым флагом «вкл» игнорируем."""
+    try:
+        raw = base64.b64decode(b64)
+    except Exception:
+        return {}
+    out = {}
+    for i in range(0, len(raw) - 3, 4):
+        key = ALARM_SET_TYPES.get(raw[i])
+        if key and raw[i + 1]:
+            out[key] = raw[i + 2] << 8 | raw[i + 3]
+    return out
 
 # Стандартные цвета для терминального вывода
 class Colors:
@@ -169,6 +195,12 @@ def apply_dps_to_device(dev: Dict[str, Any], dps: Dict[str, Any]) -> bool:
         dev["temperature_c"] = dps[codes["temperature"]]
         updated = True
 
+    # Реальные уставки защиты автомата вместо захардкоженного номинала
+    for alarm_code in (codes["alarm_set_1"], codes["alarm_set_2"]):
+        if alarm_code in dps:
+            dev.update(parse_alarm_set(dps[alarm_code]))
+            updated = True
+
     if updated and dev.get("rated_current_a"):
         dev["load_percent"] = round(dev.get("current_a", 0.0) / dev["rated_current_a"] * 100, 1)
 
@@ -223,7 +255,17 @@ class PhaseAnalyzer:
                     "message": f"Высокая нагрузка автомата: {i_act:.2f}A / {i_rated}A ({load_pct:.1f}%)"
                 })
 
-            if temp >= TEMP_WARN_C:
+            # CRITICAL — по уставке самого автомата (он реально отключится),
+            # WARNING — по гигиеническому порогу: нагрев при малом токе тоже аномалия.
+            temp_limit = dev.get("temp_limit_c")
+            if temp_limit and temp >= temp_limit:
+                alerts.append({
+                    "level": "CRITICAL",
+                    "device": dev["name"],
+                    "phase": ph,
+                    "message": f"Перегрев: {temp}°C — уставка отключения автомата {temp_limit}°C"
+                })
+            elif temp >= TEMP_WARN_C:
                 alerts.append({
                     "level": "WARNING",
                     "device": dev["name"],
@@ -233,16 +275,34 @@ class PhaseAnalyzer:
 
             # Проверка напряжения (только для однофазных линий)
             if ph != "3P":
-                if u_act <= VOLTAGE_LOW_WARNING:
+                # CRITICAL — напряжение дошло до уставки отключения автомата, если она
+                # известна, иначе до общего критического порога.
+                u_min_trip = dev.get("voltage_min_limit_v") or VOLTAGE_LOW_CRITICAL
+                u_max_trip = dev.get("voltage_max_limit_v") or VOLTAGE_HIGH_CRITICAL
+                if u_act <= u_min_trip:
                     alerts.append({
-                        "level": "CRITICAL" if u_act <= VOLTAGE_LOW_CRITICAL else "WARNING",
+                        "level": "CRITICAL",
+                        "device": dev["name"],
+                        "phase": ph,
+                        "message": f"Просадка напряжения: {u_act:.1f}В — уставка отключения {u_min_trip}В"
+                    })
+                elif u_act <= VOLTAGE_LOW_WARNING:
+                    alerts.append({
+                        "level": "WARNING",
                         "device": dev["name"],
                         "phase": ph,
                         "message": f"Просадка напряжения на линии: {u_act:.1f}В"
                     })
+                elif u_act >= u_max_trip:
+                    alerts.append({
+                        "level": "CRITICAL",
+                        "device": dev["name"],
+                        "phase": ph,
+                        "message": f"Повышение напряжения: {u_act:.1f}В — уставка отключения {u_max_trip}В"
+                    })
                 elif u_act >= VOLTAGE_HIGH_WARNING:
                     alerts.append({
-                        "level": "CRITICAL" if u_act >= VOLTAGE_HIGH_CRITICAL else "WARNING",
+                        "level": "WARNING",
                         "device": dev["name"],
                         "phase": ph,
                         "message": f"Опасное повышение напряжения на линии: {u_act:.1f}В"
@@ -618,5 +678,25 @@ def main():
         time.sleep(args.interval)
 
 
+
+def _self_check():
+    """Проверка разбора уставок на реальных значениях, снятых с автоматов SY2."""
+    # Котёл: перегрев 70°C, ток 30А, Umax 255В, Umin 175В
+    assert parse_alarm_set("BQEARgcAAAA=") == {"temp_limit_c": 70}
+    assert parse_alarm_set("AQEAHgMBAP8EAQCv") == {
+        "rated_current_a": 30, "voltage_max_limit_v": 255, "voltage_min_limit_v": 175}
+    # Обычная линия: перегрев 65°C, ток 16А, Umax 250В, Umin 180В
+    assert parse_alarm_set("BQEAQQcAAAA=") == {"temp_limit_c": 65}
+    assert parse_alarm_set("AQEAEAMBAPoEAQC0") == {
+        "rated_current_a": 16, "voltage_max_limit_v": 250, "voltage_min_limit_v": 180}
+    # Битый/пустой raw не должен ломать синк
+    assert parse_alarm_set("!!!") == {}
+    assert parse_alarm_set("") == {}
+    print("parse_alarm_set: OK")
+
+
 if __name__ == "__main__":
+    if "--self-check" in sys.argv:
+        _self_check()
+        sys.exit(0)
     main()
