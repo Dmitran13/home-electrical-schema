@@ -54,7 +54,7 @@
               <i class="fa-solid fa-triangle-exclamation mr-1"></i>ДИСБАЛАНС НАГРУЗКИ
             </span>
           </h1>
-          <p class="text-xs text-slate-400">Ввод 380/220V 15 кВт • <span id="header-device-count">33</span> устройства (Tuya SY2) • Dmitran13</p>
+          <p class="text-xs text-slate-400">Ввод 380/220V 15 кВт • <span id="header-device-count">33</span> элемента схемы • Dmitran13</p>
         </div>
       </div>
 
@@ -129,7 +129,7 @@
           <div>
             <div class="text-xs text-slate-400">Напряжение</div>
             <div id="val-u-l1" class="text-xl font-mono font-bold text-rose-400">206.9 <span class="text-xs font-normal">В</span></div>
-            <div class="text-[10px] text-rose-500/80">мин. 202.1 В</div>
+            <div id="minmax-l1" class="text-[10px] text-rose-500/80">мин. 202.1 В</div>
           </div>
           <div>
             <div class="text-xs text-slate-400">Сумм. ток</div>
@@ -138,7 +138,7 @@
           <div>
             <div class="text-xs text-slate-400">Мощность</div>
             <div id="val-p-l1" class="text-xl font-mono font-bold text-slate-100">3.11 <span class="text-xs font-normal">кВт</span></div>
-            <div class="text-[10px] text-slate-400">7 линий</div>
+            <div id="lines-l1" class="text-[10px] text-slate-400">7 линий</div>
           </div>
         </div>
 
@@ -181,7 +181,7 @@
           <div>
             <div class="text-xs text-slate-400">Мощность</div>
             <div id="val-p-l2" class="text-xl font-mono font-bold text-slate-100">0.49 <span class="text-xs font-normal">кВт</span></div>
-            <div class="text-[10px] text-slate-400">18 линий</div>
+            <div id="lines-l2" class="text-[10px] text-slate-400">18 линий</div>
           </div>
         </div>
 
@@ -213,7 +213,7 @@
           <div>
             <div class="text-xs text-slate-400">Напряжение</div>
             <div id="val-u-l3" class="text-xl font-mono font-bold text-violet-400">233.7 <span class="text-xs font-normal">В</span></div>
-            <div class="text-[10px] text-violet-400">макс. 242.1 В!</div>
+            <div id="minmax-l3" class="text-[10px] text-violet-400">макс. 242.1 В!</div>
           </div>
           <div>
             <div class="text-xs text-slate-400">Сумм. ток</div>
@@ -223,7 +223,7 @@
           <div>
             <div class="text-xs text-slate-400">Мощность</div>
             <div id="val-p-l3" class="text-xl font-mono font-bold text-slate-100">0.10 <span class="text-xs font-normal">кВт</span></div>
-            <div class="text-[10px] text-slate-400">3 линии</div>
+            <div id="lines-l3" class="text-[10px] text-slate-400">3 линии</div>
           </div>
         </div>
 
@@ -295,7 +295,7 @@
         <h2 class="text-lg font-bold text-white flex items-center gap-2">
           <i class="fa-solid fa-diagram-project text-sky-400"></i> Топология подключения
         </h2>
-        <p class="text-xs text-slate-400">Ввод → QF1 → QD1 → фазные шины → РКН → автоматы. Строится из реальных данных, кликабельно.</p>
+        <p class="text-xs text-slate-400">Уличный щиток (АВР + генератор) → QF1 → QD1 → фазные шины → РКН → автоматы. Строится из реальных данных, кликабельно.</p>
       </div>
       <div id="topology-container" class="overflow-x-auto">
         <!-- Генерируется через JS -->
@@ -310,7 +310,7 @@
         </div>
         <div>
           <h3 class="text-base sm:text-lg font-bold text-white">Инженерный план балансировки распределительного щита</h3>
-          <p class="text-xs text-slate-400">Устранение просадки L1 до 202В и завышения L3 до 242В</p>
+          <p class="text-xs text-slate-400">Выравнивание токов между фазами (L1/L2 ≈ 16А при почти нулевом L3)</p>
         </div>
       </div>
 
@@ -578,6 +578,17 @@
       document.getElementById(`val-p-${p}`).innerHTML = `${kw} <span class="text-xs font-normal">кВт</span>`;
       document.getElementById(`bar-text-${p}`).innerText = `${i}A / ${denom}A (${pct.toFixed(1)}%)`;
       document.getElementById(`bar-fill-${p}`).style.width = `${pct.toFixed(1)}%`;
+      const linesEl = document.getElementById(`lines-${p}`);
+      if (linesEl) linesEl.innerText = `${m.device_count} линий`;
+
+      if (phase === 'L1') {
+        const minEl = document.getElementById('minmax-l1');
+        if (minEl) minEl.innerText = `мин. ${m.voltage_min_v.toFixed(1)} В`;
+      }
+      if (phase === 'L3') {
+        const maxEl = document.getElementById('minmax-l3');
+        if (maxEl) maxEl.innerText = `макс. ${m.voltage_max_v.toFixed(1)} В${m.voltage_max_v >= 240 ? '!' : ''}`;
+      }
 
       if (phase === 'L1') {
         document.getElementById('bar-fill-l1').className = 'h-full rounded-full transition-all duration-700 '
@@ -619,6 +630,23 @@
       const mainBreaker = devices.find(d => d.category === 'input');
       const rcd = devices.find(d => d.category === 'protection' && d.phase === '3P');
 
+      // Уличный щиток: 2 обычных (не Tuya) автомата на 32А, между ними АВР + резервный
+      // генератор 5кВт. Нет телеметрии — узлы кликабельны, но без тока/температуры.
+      const streetIn1 = devices.find(d => d.id === 'STREET-IN1');
+      const streetAts = devices.find(d => d.id === 'STREET-ATS');
+      const streetGen = devices.find(d => d.id === 'STREET-GEN');
+      const streetIn2 = devices.find(d => d.id === 'STREET-IN2');
+      const streetNode = dev => {
+        if (!dev) return '';
+        const isOff = dev.state === 'OFF';
+        const dot = isOff ? 'bg-slate-600' : 'bg-sky-400';
+        return `
+          <div data-topo-dev-id="${dev.id}" class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-sky-950/30 border border-sky-700/50 hover:border-sky-400/70 cursor-pointer text-xs whitespace-nowrap">
+            <span class="w-2 h-2 rounded-full ${dot} flex-shrink-0"></span>
+            <span class="font-medium text-sky-200">${dev.name}</span>
+          </div>`;
+      };
+
       const breakerNode = dev => {
         const st = PHASE_STYLE[dev.phase] || PHASE_STYLE.L1;
         const isOff = dev.state === 'OFF';
@@ -654,6 +682,19 @@
 
       container.innerHTML = `
         <div class="flex flex-col items-center py-2">
+          ${streetIn1 ? `
+          <div class="text-[10px] uppercase tracking-wide text-sky-500/80 font-bold mb-1">Уличный щиток (нет телеметрии)</div>
+          ${streetNode(streetIn1)}
+          ${topoLine(true)}
+          <div class="flex items-center gap-3">
+            ${streetNode(streetAts)}
+            <span class="text-slate-600 text-xs">⇄</span>
+            ${streetNode(streetGen)}
+          </div>
+          ${topoLine(true)}
+          ${streetNode(streetIn2)}
+          ${topoLine()}
+          ` : ''}
           <div class="px-4 py-2 rounded-xl bg-slate-800 border border-slate-600 text-center">
             <div class="text-xs font-bold text-white">${gs.system_type || 'Ввод'}</div>
             <div class="text-[10px] text-slate-400 font-mono">${gs.nominal_voltage || ''} • ${gs.allocated_power_kw || '?'} кВт</div>
@@ -868,7 +909,7 @@
     }
 
     // Резервная заглушка на случай, если schema_data.json недоступен (например, открыт как file://).
-    // Полноценные данные — только в schema_data.json; здесь дублировать 28 устройств незачем.
+    // Полноценные данные — только в schema_data.json; здесь дублировать 18 автоматов незачем.
     function getFallbackData() {
       const zeroPhase = { voltage_avg_v: 0, total_current_a: 0, total_power_w: 0 };
       return {
