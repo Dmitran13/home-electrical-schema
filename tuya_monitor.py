@@ -314,7 +314,11 @@ class PhaseAnalyzer:
             active_devs = [d for d in devs if d.get("state") == "ON" and d.get("category") != "protection"]
             cur_sum = sum(d.get("current_a", 0.0) for d in active_devs)
             pwr_sum = sum(d.get("power_w", 0.0) for d in active_devs)
-            volts = [d.get("voltage_v", 0.0) for d in devs if d.get("voltage_v", 0) > 0]
+            # РКН-реле не телеметрируются Tuya и хранят статичное значение со старого
+            # снимка — не пускаем их в min/max, иначе застрявшее число реле маскирует
+            # реальный разброс по фазе.
+            volts = [d.get("voltage_v", 0.0) for d in devs
+                     if d.get("category") != "protection" and d.get("voltage_v", 0) > 0]
             avg_u = sum(volts) / len(volts) if volts else 0.0
             min_u = min(volts) if volts else 0.0
             max_u = max(volts) if volts else 0.0

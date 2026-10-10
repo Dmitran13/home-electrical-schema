@@ -20,18 +20,18 @@
 
   <!-- Title -->
   <text x="600" y="45" fill="#f8fafc" font-size="22" font-weight="bold" text-anchor="middle">ОДНОЛИНЕЙНАЯ СХЕМА ЭЛЕКТРОСЕТИ И РАСПРЕДЕЛИТЕЛЬНОГО ЩИТА (3 ФАЗЫ)</text>
-  <text x="600" y="70" fill="#94a3b8" font-size="13" text-anchor="middle">Ввод TN-C-S 3P+N 15 кВт • 33 устройства Tuya SY2 • Анализ асимметрии нагрузки</text>
+  <text x="600" y="70" fill="#94a3b8" font-size="13" text-anchor="middle">Ввод TN-C-S 3P+N 15 кВт • 18 автоматов Tuya SY2 • Анализ асимметрии нагрузки</text>
 
   <!-- Grid Input Box -->
   <g transform="translate(50, 100)">
     <rect width="240" height="150" rx="10" fill="#1e293b" stroke="#475569" stroke-width="2"/>
     <text x="120" y="30" fill="#f1f5f9" font-size="14" font-weight="bold" text-anchor="middle">ВВОДНАЯ СЕТЬ (380/220В)</text>
     <line x1="20" y1="45" x2="220" y2="45" stroke="#334155" stroke-width="1"/>
-    
-    <text x="25" y="70" fill="#ef4444" font-size="12" font-weight="bold">L1: 206.9В (14.99A)</text>
-    <text x="25" y="90" fill="#10b981" font-size="12" font-weight="bold">L2: 219.7В (3.66A)</text>
-    <text x="25" y="110" fill="#8b5cf6" font-size="12" font-weight="bold">L3: 233.7В (0.41A)</text>
-    <text x="25" y="130" fill="#38bdf8" font-size="12" font-weight="bold">N: Смещение нейтрали 23.1В</text>
+
+    <text x="25" y="70" fill="#ef4444" font-size="12" font-weight="bold">L1: 195.7В (15.95A)</text>
+    <text x="25" y="90" fill="#10b981" font-size="12" font-weight="bold">L2: 195.1В (15.65A)</text>
+    <text x="25" y="110" fill="#8b5cf6" font-size="12" font-weight="bold">L3: 217.5В (0.61A)</text>
+    <text x="25" y="130" fill="#38bdf8" font-size="12" font-weight="bold">Разброс фаз: 43.7В</text>
   </g>
 
   <!-- Flow Arrow to Main Breaker -->
@@ -42,7 +42,7 @@
     <rect width="220" height="150" rx="10" fill="#1e293b" stroke="#64748b" stroke-width="2"/>
     <text x="110" y="28" fill="#f8fafc" font-size="13" font-weight="bold" text-anchor="middle">ВВОДНОЙ БЛОК ЗАЩИТЫ</text>
     <line x1="15" y1="40" x2="205" y2="40" stroke="#334155" stroke-width="1"/>
-    
+
     <rect x="20" y="55" width="180" height="35" rx="6" fill="#0f172a" stroke="#cbd5e1" stroke-width="1"/>
     <text x="110" y="77" fill="#f8fafc" font-size="11" font-weight="bold" text-anchor="middle">QF1: Вводной автомат 3P 25A</text>
 
@@ -57,63 +57,63 @@
   <g transform="translate(610, 85)">
     <rect width="250" height="180" rx="10" fill="#1e293b" stroke="#e2e8f0" stroke-width="2"/>
     <text x="125" y="25" fill="#f8fafc" font-size="13" font-weight="bold" text-anchor="middle">РЕЛЕ КОНТРОЛЯ НАПРЯЖЕНИЯ</text>
-    
+
     <!-- L1 Relay -->
     <rect x="15" y="40" width="220" height="38" rx="6" fill="#450a0a" stroke="#ef4444" stroke-width="1.5"/>
-    <text x="25" y="58" fill="#fca5a5" font-size="11" font-weight="bold">РКН L1: 206.9 В (ПРОСАДКА)</text>
-    <text x="25" y="72" fill="#f87171" font-size="10">Уставка порога Umin 195В</text>
+    <text x="25" y="58" fill="#fca5a5" font-size="11" font-weight="bold">РКН L1: фаза ~196В (у уставки Umin 195В)</text>
+    <text x="25" y="72" fill="#f87171" font-size="10">На грани отключения по просадке</text>
 
     <!-- L2 Relay -->
-    <rect x="15" y="85" width="220" height="38" rx="6" fill="#064e3b" stroke="#10b981" stroke-width="1.5"/>
-    <text x="25" y="103" fill="#6ee7b7" font-size="11" font-weight="bold">РКН L2: 219.7 В (НОРМА)</text>
-    <text x="25" y="117" fill="#34d399" font-size="10">Стабильный диапазон 215-223В</text>
+    <rect x="15" y="85" width="220" height="38" rx="6" fill="#450a0a" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="25" y="103" fill="#fca5a5" font-size="11" font-weight="bold">РКН L2: фаза ~195В (у уставки Umin 195В)</text>
+    <text x="25" y="117" fill="#f87171" font-size="10">Тоже на грани отключения</text>
 
     <!-- L3 Relay -->
-    <rect x="15" y="130" width="220" height="38" rx="6" fill="#3b0764" stroke="#8b5cf6" stroke-width="1.5"/>
-    <text x="25" y="148" fill="#d8b4fe" font-size="11" font-weight="bold">РКН L3: 233.7 В (ПИК 242.1В)</text>
-    <text x="25" y="162" fill="#c084fc" font-size="10">Уставка порога Umax 250В</text>
+    <rect x="15" y="130" width="220" height="38" rx="6" fill="#064e3b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="25" y="148" fill="#6ee7b7" font-size="11" font-weight="bold">РКН L3: фаза ~218В (запас до Umax 250В)</text>
+    <text x="25" y="162" fill="#34d399" font-size="10">В норме, недогружена по току</text>
   </g>
 
   <!-- Phase Distribution Busbars (3 Horizontal Branches) -->
-  
+
   <!-- PHASE 1 BUS -->
   <g transform="translate(50, 310)">
     <rect width="1100" height="135" rx="10" fill="url(#l1Grad)" stroke="#ef4444" stroke-width="2"/>
     <rect x="10" y="10" width="250" height="115" rx="8" fill="#0f172a" stroke="#ef4444" stroke-width="1.5"/>
     <text x="20" y="32" fill="#f87171" font-size="14" font-weight="bold">ФАЗА 1 (L1) • ПЕРЕГРУЗКА</text>
-    <text x="20" y="55" fill="#fca5a5" font-size="12">Ток: 14.99 А | Мощность: 3107 Вт</text>
-    <text x="20" y="75" fill="#fca5a5" font-size="12">Напряжение: 202.1 - 212.0 В</text>
-    <text x="20" y="105" fill="#ef4444" font-size="11" font-weight="bold">ВНИМАНИЕ: Смещение нейтрали!</text>
+    <text x="20" y="55" fill="#fca5a5" font-size="12">Ток: 15.95 А | Мощность: 3360.5 Вт</text>
+    <text x="20" y="75" fill="#fca5a5" font-size="12">Напряжение: 187.0 - 210.6 В</text>
+    <text x="20" y="105" fill="#ef4444" font-size="11" font-weight="bold">ВНИМАНИЕ: просадка у порога РКН!</text>
 
     <!-- Breakers L1 -->
     <g transform="translate(280, 15)">
-      <!-- Kotel (Critical) -->
+      <!-- Kotel (heavy but within breaker's own 30A setting) -->
       <rect x="0" y="0" width="180" height="105" rx="6" fill="#7f1d1d" stroke="#f87171" stroke-width="2" filter="url(#glow)"/>
       <text x="10" y="24" fill="#fef2f2" font-size="11" font-weight="bold">3 котёл насос 1тэн</text>
-      <text x="10" y="44" fill="#fca5a5" font-size="13" font-weight="bold">14.99 A (94%)</text>
-      <text x="10" y="64" fill="#fee2e2" font-size="11">206.9 В • 3107 Вт</text>
-      <text x="10" y="88" fill="#f87171" font-size="10" font-weight="bold">t=39°C • КРИТИЧЕСКИЙ</text>
+      <text x="10" y="44" fill="#fca5a5" font-size="13" font-weight="bold">15.95 A (53% от 30А)</text>
+      <text x="10" y="64" fill="#fee2e2" font-size="11">210.6 В • 3360.5 Вт</text>
+      <text x="10" y="88" fill="#f87171" font-size="10" font-weight="bold">t=41°C • тяжёлая нагрузка</text>
 
       <!-- Mishen -->
       <rect x="195" y="0" width="140" height="105" rx="6" fill="#1e293b" stroke="#475569" stroke-width="1"/>
-      <text x="205" y="24" fill="#e2e8f0" font-size="11" font-weight="bold">Мишень</text>
+      <text x="205" y="24" fill="#e2e8f0" font-size="11" font-weight="bold">Мишень (газ?)</text>
       <text x="205" y="44" fill="#94a3b8" font-size="11">0 A • ВЫКЛ</text>
-      <text x="205" y="64" fill="#f87171" font-size="11" font-weight="bold">202.1 В (МИН)</text>
-      <text x="205" y="88" fill="#64748b" font-size="10">t=32°C</text>
+      <text x="205" y="64" fill="#f87171" font-size="11" font-weight="bold">187.2 В (МИН)</text>
+      <text x="205" y="88" fill="#64748b" font-size="10">t=24°C</text>
 
       <!-- Krasnaya Rozetka -->
       <rect x="350" y="0" width="140" height="105" rx="6" fill="#1e293b" stroke="#475569" stroke-width="1"/>
       <text x="360" y="24" fill="#e2e8f0" font-size="11" font-weight="bold">красная розетка</text>
       <text x="360" y="44" fill="#94a3b8" font-size="11">0 A • ВЫКЛ</text>
-      <text x="360" y="64" fill="#fca5a5" font-size="11">203.5 В</text>
-      <text x="360" y="88" fill="#64748b" font-size="10">t=31°C</text>
+      <text x="360" y="64" fill="#fca5a5" font-size="11">195.3 В</text>
+      <text x="360" y="88" fill="#64748b" font-size="10">t=21°C</text>
 
       <!-- Yulya, Roz N, Nasos, Garderob summary -->
       <rect x="505" y="0" width="295" height="105" rx="6" fill="#1e293b" stroke="#64748b" stroke-width="1"/>
-      <text x="515" y="24" fill="#f1f5f9" font-size="11" font-weight="bold">Остальные потребители L1 (ВКЛ)</text>
-      <text x="515" y="45" fill="#cbd5e1" font-size="10">• Юля (207.3В, t=36°C) • Гардероб (212.0В, t=39°C)</text>
-      <text x="515" y="65" fill="#cbd5e1" font-size="10">• Роз Н (210.2В, t=31°C) • Насос (211.4В, t=30°C)</text>
-      <text x="515" y="90" fill="#38bdf8" font-size="10">Дежурный режим (0.0А)</text>
+      <text x="515" y="24" fill="#f1f5f9" font-size="11" font-weight="bold">Остальные потребители L1</text>
+      <text x="515" y="45" fill="#cbd5e1" font-size="10">• Юля (196.8В ВКЛ) • Гардероб (189.5В ВКЛ)</text>
+      <text x="515" y="65" fill="#cbd5e1" font-size="10">• Роз Н (203.8В ВКЛ) • Насос (187.0В ВЫКЛ)</text>
+      <text x="515" y="90" fill="#38bdf8" font-size="10">Дежурный режим (~0.0А)</text>
     </g>
   </g>
 
@@ -121,42 +121,41 @@
   <g transform="translate(50, 465)">
     <rect width="1100" height="135" rx="10" fill="url(#l2Grad)" stroke="#10b981" stroke-width="2"/>
     <rect x="10" y="10" width="250" height="115" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="1.5"/>
-    <text x="20" y="32" fill="#34d399" font-size="14" font-weight="bold">ФАЗА 2 (L2) • ШТАТНЫЙ РЕЖИМ</text>
-    <text x="20" y="55" fill="#a7f3d0" font-size="12">Ток: 3.66 А | Мощность: 489.5 Вт</text>
-    <text x="20" y="75" fill="#a7f3d0" font-size="12">Напряжение: 215.5 - 223.3 В</text>
-    <text x="20" y="105" fill="#6ee7b7" font-size="11">Всего 18 модулей Tuya SY2</text>
+    <text x="20" y="32" fill="#f87171" font-size="14" font-weight="bold">ФАЗА 2 (L2) • ТЯЖЕЛО ЗАГРУЖЕНА</text>
+    <text x="20" y="55" fill="#a7f3d0" font-size="12">Ток: 15.65 А | Мощность: 2820.0 Вт</text>
+    <text x="20" y="75" fill="#a7f3d0" font-size="12">Напряжение: 190.3 - 208.3 В</text>
+    <text x="20" y="105" fill="#f87171" font-size="11" font-weight="bold">Почти как L1 — не штатный режим</text>
 
-    <!-- Breakers L2 Selected -->
+    <!-- Breakers L2 -->
     <g transform="translate(280, 15)">
+      <!-- Boiler/Water (main load) -->
+      <rect x="0" y="0" width="190" height="105" rx="6" fill="#064e3b" stroke="#34d399" stroke-width="2"/>
+      <text x="10" y="24" fill="#d1fae5" font-size="11" font-weight="bold">2 бойлер/скваж./очистка</text>
+      <text x="10" y="44" fill="#a7f3d0" font-size="12" font-weight="bold">7.98 A (27% от 30А)</text>
+      <text x="10" y="64" fill="#a7f3d0" font-size="11">190.3 В • 1497.7 Вт</text>
+      <text x="10" y="88" fill="#6ee7b7" font-size="10">t=41°C</text>
+
+      <!-- Boiler L2-16 -->
+      <rect x="205" y="0" width="180" height="105" rx="6" fill="#064e3b" stroke="#34d399" stroke-width="2"/>
+      <text x="215" y="24" fill="#d1fae5" font-size="11" font-weight="bold">Бойлер</text>
+      <text x="215" y="44" fill="#a7f3d0" font-size="12" font-weight="bold">5.90 A (37% от 16А)</text>
+      <text x="215" y="64" fill="#a7f3d0" font-size="11">193.0 В • 1132.3 Вт</text>
+      <text x="215" y="88" fill="#6ee7b7" font-size="10">t=39°C</text>
+
       <!-- Skvazhina (Overheating) -->
-      <rect x="0" y="0" width="180" height="105" rx="6" fill="#451a03" stroke="#f59e0b" stroke-width="2"/>
-      <text x="10" y="24" fill="#fef3c7" font-size="11" font-weight="bold">Скважина</text>
-      <text x="10" y="44" fill="#fde68a" font-size="11">0.096 A • 2.3 Вт</text>
-      <text x="10" y="64" fill="#fde68a" font-size="11">217.2 В</text>
-      <text x="10" y="88" fill="#f59e0b" font-size="11" font-weight="bold">⚠️ t=43°C (ПЕРЕГРЕВ!)</text>
+      <rect x="400" y="0" width="175" height="105" rx="6" fill="#451a03" stroke="#f59e0b" stroke-width="2"/>
+      <text x="410" y="24" fill="#fef3c7" font-size="11" font-weight="bold">Скважина</text>
+      <text x="410" y="44" fill="#fde68a" font-size="11">0.10 A • 2.7 Вт</text>
+      <text x="410" y="64" fill="#fde68a" font-size="11">193.5 В</text>
+      <text x="410" y="88" fill="#f59e0b" font-size="11" font-weight="bold">⚠️ t=44°C (ПЕРЕГРЕВ!)</text>
 
-      <!-- Boiler / Water -->
-      <rect x="195" y="0" width="170" height="105" rx="6" fill="#064e3b" stroke="#34d399" stroke-width="1"/>
-      <text x="205" y="24" fill="#d1fae5" font-size="11" font-weight="bold">2 бойлер холод очист</text>
-      <text x="205" y="44" fill="#a7f3d0" font-size="11">0.987 A • 170.1 Вт</text>
-      <text x="205" y="64" fill="#a7f3d0" font-size="11">215.5 В • t=39°C</text>
-      <text x="205" y="88" fill="#6ee7b7" font-size="10">Резерв для балансировки</text>
-
-      <!-- Kitchen & Appliances -->
-      <rect x="380" y="0" width="200" height="105" rx="6" fill="#1e293b" stroke="#475569" stroke-width="1"/>
-      <text x="390" y="24" fill="#e2e8f0" font-size="11" font-weight="bold">Бытовая техника & Кухня</text>
-      <text x="390" y="44" fill="#94a3b8" font-size="10">• Freeze: 0.51A (109Вт) 223.2В</text>
-      <text x="390" y="62" fill="#94a3b8" font-size="10">• Бойлер: 0.88A (75Вт) 221.5В</text>
-      <text x="390" y="80" fill="#94a3b8" font-size="10">• Кухня, СВЧ, Посудомойка</text>
-      <text x="390" y="96" fill="#6ee7b7" font-size="9">Все линии ВКЛ</text>
-
-      <!-- Rooms & Light -->
-      <rect x="595" y="0" width="205" height="105" rx="6" fill="#1e293b" stroke="#475569" stroke-width="1"/>
-      <text x="605" y="24" fill="#e2e8f0" font-size="11" font-weight="bold">Освещение и Комнаты</text>
-      <text x="605" y="44" fill="#94a3b8" font-size="10">• Свет везде: 0.18A (24Вт)</text>
-      <text x="605" y="62" fill="#94a3b8" font-size="10">• Спальня, Холл, Мелания</text>
-      <text x="605" y="80" fill="#94a3b8" font-size="10">• Кондиционер, Роутер (6Вт)</text>
-      <text x="605" y="96" fill="#6ee7b7" font-size="9">Стабильное U ~ 220 В</text>
+      <!-- Rooms summary -->
+      <rect x="590" y="0" width="210" height="105" rx="6" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+      <text x="600" y="24" fill="#e2e8f0" font-size="11" font-weight="bold">Комнаты и свет L2</text>
+      <text x="600" y="44" fill="#94a3b8" font-size="10">• Холл 1.07A • Спальня 0.21A</text>
+      <text x="600" y="62" fill="#94a3b8" font-size="10">• Туалет 0.24A • Гостиная 0.12A</text>
+      <text x="600" y="80" fill="#94a3b8" font-size="10">• Мелания 0.03A</text>
+      <text x="600" y="96" fill="#6ee7b7" font-size="9">Все линии ВКЛ, лёгкая нагрузка</text>
     </g>
   </g>
 
@@ -165,32 +164,32 @@
     <rect width="1100" height="135" rx="10" fill="url(#l3Grad)" stroke="#8b5cf6" stroke-width="2"/>
     <rect x="10" y="10" width="250" height="115" rx="8" fill="#0f172a" stroke="#8b5cf6" stroke-width="1.5"/>
     <text x="20" y="32" fill="#c084fc" font-size="14" font-weight="bold">ФАЗА 3 (L3) • НЕДОГРУЖЕНА</text>
-    <text x="20" y="55" fill="#e9d5ff" font-size="12">Ток: 0.41 А | Мощность: 95.1 Вт</text>
-    <text x="20" y="75" fill="#fca5a5" font-size="12" font-weight="bold">Напряжение завышено: до 242.1 В</text>
-    <text x="20" y="105" fill="#d8b4fe" font-size="11">Сюда рекомендуется перенести ТЭН!</text>
+    <text x="20" y="55" fill="#e9d5ff" font-size="12">Ток: 0.61 А | Мощность: 91.6 Вт</text>
+    <text x="20" y="75" fill="#e9d5ff" font-size="12">Напряжение: 197.4 - 230.7 В</text>
+    <text x="20" y="105" fill="#d8b4fe" font-size="11">Запас до Umax 250В — свободна для переноса нагрузки</text>
 
     <!-- Breakers L3 -->
     <g transform="translate(280, 15)">
       <!-- Plita -->
       <rect x="0" y="0" width="230" height="105" rx="6" fill="#2e1065" stroke="#c084fc" stroke-width="1.5"/>
       <text x="10" y="24" fill="#faf5ff" font-size="11" font-weight="bold">1 плита п/м дух 2ключ тена</text>
-      <text x="10" y="44" fill="#e9d5ff" font-size="12">0.414 A • 95.1 Вт</text>
-      <text x="10" y="64" fill="#e9d5ff" font-size="11">229.2 В • t=39°C</text>
-      <text x="10" y="88" fill="#c084fc" font-size="10">Готова принять нагрузку котла</text>
+      <text x="10" y="44" fill="#e9d5ff" font-size="12">0.19 A (0.6% от 30А)</text>
+      <text x="10" y="64" fill="#e9d5ff" font-size="11">224.3 В • t=39°C</text>
+      <text x="10" y="88" fill="#c084fc" font-size="10">Готова принять нагрузку с L1/L2</text>
+
+      <!-- Kitchen (moved here from L2) -->
+      <rect x="250" y="0" width="200" height="105" rx="6" fill="#2e1065" stroke="#c084fc" stroke-width="1.5"/>
+      <text x="260" y="24" fill="#faf5ff" font-size="11" font-weight="bold">Кухня (с L2)</text>
+      <text x="260" y="44" fill="#e9d5ff" font-size="12">0.42 A • 49.8 Вт</text>
+      <text x="260" y="64" fill="#e9d5ff" font-size="11">197.4 В • t=37°C</text>
+      <text x="260" y="88" fill="#c084fc" font-size="10">Перенесена для разгрузки L2</text>
 
       <!-- Roz V -->
-      <rect x="250" y="0" width="160" height="105" rx="6" fill="#1e293b" stroke="#475569" stroke-width="1"/>
-      <text x="260" y="24" fill="#e2e8f0" font-size="11" font-weight="bold">Роз В</text>
-      <text x="260" y="44" fill="#94a3b8" font-size="11">0 A • ВЫКЛ</text>
-      <text x="260" y="64" fill="#cbd5e1" font-size="11">229.7 В</text>
-      <text x="260" y="88" fill="#64748b" font-size="10">t=30°C</text>
-
-      <!-- SY2 Overvoltage Sensor -->
-      <rect x="430" y="0" width="370" height="105" rx="6" fill="#3b0764" stroke="#e879f9" stroke-width="1.5"/>
-      <text x="440" y="24" fill="#fae8ff" font-size="11" font-weight="bold">WiFi выключатель SY2 (счетчик)</text>
-      <text x="440" y="44" fill="#f5d0fe" font-size="12">0 A • 0 Вт • t=33°C</text>
-      <text x="440" y="68" fill="#f43f5e" font-size="14" font-weight="bold">⚠️ НАПРЯЖЕНИЕ 242.1 В (МАКСИМУМ)</text>
-      <text x="440" y="88" fill="#e879f9" font-size="10">Асимметрия вызвана смещением нейтральной точки N</text>
+      <rect x="470" y="0" width="160" height="105" rx="6" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+      <text x="480" y="24" fill="#e2e8f0" font-size="11" font-weight="bold">Роз В</text>
+      <text x="480" y="44" fill="#94a3b8" font-size="11">0 A • ВЫКЛ</text>
+      <text x="480" y="64" fill="#cbd5e1" font-size="11">230.7 В</text>
+      <text x="480" y="88" fill="#64748b" font-size="10">t=22°C</text>
     </g>
   </g>
 </svg>
