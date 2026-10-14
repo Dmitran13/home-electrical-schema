@@ -174,6 +174,10 @@ class TuyaCloudClient:
                 data = json.loads(resp.read().decode("utf-8"))
                 if data.get("success"):
                     return {item["code"]: item["value"] for item in data.get("result", [])}
+                # Tuya ответил без исключения, но success=false (например истекла подписка
+                # IoT Core, нет прав на устройство и т.п.) — раньше это молча проглатывалось,
+                # и "0 синкнуто" выглядело неотличимо от "у устройств нет tuya_device_id".
+                print(f"[Tuya API Error] {device_id}: {data.get('msg')}", file=sys.stderr)
                 return None
         except Exception as e:
             print(f"[Tuya Device Query Error] {device_id}: {e}", file=sys.stderr)
@@ -213,17 +217,21 @@ def apply_dps_to_device(dev: Dict[str, Any], dps: Dict[str, Any]) -> bool:
     return updated
 
 
-def sync_live_devices(client: "TuyaCloudClient", schema: Dict[str, Any]) -> int:
-    """Опрашивает Tuya Cloud по устройствам с заполненным tuya_device_id и мержит статус в schema."""
+def sync_live_devices(client: "TuyaCloudClient", schema: Dict[str, Any]) -> tuple:
+    """Опрашивает Tuya Cloud по устройствам с заполненным tuya_device_id и мержит статус в schema.
+    Возвращает (synced, attempted) — attempted нужен, чтобы отличить "устройств с
+    tuya_device_id нет вообще" от "были, но все запросы к Tuya провалились"."""
     synced = 0
+    attempted = 0
     for dev in schema.get("devices", []):
         device_id = dev.get("tuya_device_id")
         if not device_id:
             continue
+        attempted += 1
         dps = client.get_device_status(device_id)
         if dps and apply_dps_to_device(dev, dps):
             synced += 1
-    return synced
+    return synced, attempted
 
 
 class PhaseAnalyzer:
@@ -653,9 +661,12 @@ def main():
         schema = load_local_schema(schema_path)
 
         if client:
-            synced = sync_live_devices(client, schema)
+            synced, attempted = sync_live_devices(client, schema)
             if synced:
-                print(f"{Colors.GREEN}[SYNC] Обновлено устройств из Tuya Cloud: {synced}{Colors.RESET}")
+                print(f"{Colors.GREEN}[SYNC] Обновлено устройств из Tuya Cloud: {synced}/{attempted}{Colors.RESET}")
+            elif attempted:
+                print(f"{Colors.RED}[SYNC] Ни одно из {attempted} устройств не синкнулось — см. "
+                      f"[Tuya API Error]/[Tuya Device Query Error] выше. Используются локальные данные.{Colors.RESET}")
             else:
                 print(f"{Colors.YELLOW}[SYNC] Нет устройств с полем tuya_device_id — используются локальные данные.{Colors.RESET}")
 
