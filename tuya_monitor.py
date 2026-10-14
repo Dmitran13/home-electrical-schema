@@ -121,6 +121,12 @@ class TuyaCloudClient:
         import urllib.request
         import urllib.error
 
+        # Подпись запроса токена НЕ должна содержать access_token (даже старый/просроченный) —
+        # в долгоживущем процессе (--daemon) при повторной авторизации после истечения токена
+        # сюда иначе попадал старый self.access_token, подпись не совпадала с ожиданием Tuya
+        # ("sign invalid"), и каждый следующий опрос устройств молча проваливался навсегда.
+        self.access_token = None
+
         t = str(int(time.time() * 1000))
         path = "/v1.0/token?grant_type=1"
         sign = self._calc_sign("GET", path, t)
@@ -697,6 +703,31 @@ def _self_check():
     assert parse_alarm_set("!!!") == {}
     assert parse_alarm_set("") == {}
     print("parse_alarm_set: OK")
+
+    # Регрессия: authenticate() ДОЛЖЕН подписывать запрос токена с пустым access_token,
+    # даже если в объекте уже лежит старый/просроченный — иначе в --daemon после первого
+    # истечения токена повторная авторизация всегда выдаёт "sign invalid" и синк с Tuya
+    # молча замирает навсегда (баг жил именно так — обнаружен при разборе "почему автомат
+    # кухни показывает неизменные данные часами").
+    import unittest.mock as _mock
+    client = TuyaCloudClient("test_id", "test_secret", "eu")
+    client.access_token = "some-stale-token-from-previous-auth"
+    seen_tokens = []
+    real_calc_sign = client._calc_sign
+
+    def spy_calc_sign(method, path, t, body=""):
+        seen_tokens.append(client.access_token)
+        return real_calc_sign(method, path, t, body)
+
+    fake_resp = _mock.MagicMock()
+    fake_resp.read.return_value = b'{"success": false, "msg": "stub"}'
+    fake_resp.__enter__.return_value = fake_resp
+    with _mock.patch.object(client, "_calc_sign", side_effect=spy_calc_sign), \
+         _mock.patch("urllib.request.urlopen", return_value=fake_resp):
+        client.authenticate()
+    assert seen_tokens == [None], (
+        f"authenticate() подписал запрос токена со access_token={seen_tokens!r}, ожидался [None]")
+    print("authenticate(): access_token очищается перед подписью — OK")
 
 
 if __name__ == "__main__":
