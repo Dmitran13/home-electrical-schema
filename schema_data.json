@@ -1,7 +1,7 @@
 {
   "project": "Home Electrical Power Distribution & Monitoring",
   "version": "1.2.0",
-  "updated_at": "2026-10-10T14:16:11Z",
+  "updated_at": "2026-10-14T20:47:50Z",
   "grid_specifications": {
     "system_type": "3-Phase TN-C-S / TN-S",
     "nominal_voltage": "230/400V 50Hz",
@@ -14,26 +14,26 @@
     "L1": {
       "phase_name": "Фаза 1 (L1)",
       "color": "#ef4444",
-      "voltage_avg_v": 195.7,
+      "voltage_avg_v": 195.5,
       "voltage_min_v": 187.0,
       "voltage_max_v": 210.6,
-      "total_current_a": 15.95,
-      "total_power_w": 3360.5,
-      "device_count": 8,
+      "total_current_a": 16.04,
+      "total_power_w": 3363.2,
+      "device_count": 9,
       "status": "VOLTAGE_WARNING",
-      "assessment": "Напряжение вне нормы: 195.7В."
+      "assessment": "Напряжение вне нормы: 195.5В."
     },
     "L2": {
       "phase_name": "Фаза 2 (L2)",
       "color": "#10b981",
-      "voltage_avg_v": 195.1,
+      "voltage_avg_v": 195.3,
       "voltage_min_v": 190.3,
       "voltage_max_v": 208.3,
-      "total_current_a": 15.65,
-      "total_power_w": 2820.0,
-      "device_count": 9,
+      "total_current_a": 15.55,
+      "total_power_w": 2817.3,
+      "device_count": 8,
       "status": "VOLTAGE_WARNING",
-      "assessment": "Напряжение вне нормы: 195.1В."
+      "assessment": "Напряжение вне нормы: 195.3В."
     },
     "L3": {
       "phase_name": "Фаза 3 (L3)",
@@ -53,27 +53,27 @@
     "phase_voltage_spread_v": 43.7,
     "current_unbalance_ratio_pct": 94.32,
     "risk_level": "HIGH",
-    "primary_cause": "Котёл (Фаза 1, ~16А) и бойлер+скважина (Фаза 2, ~16А) нагружены почти поровну, Фаза 3 простаивает (0.6А) — весь небаланс идёт через нейтраль.",
+    "primary_cause": "Котёл+скважина (Фаза 1, ~16А) и бойлер (Фаза 2, ~16А) нагружены почти поровну, Фаза 3 простаивает (0.6А) — весь небаланс идёт через нейтраль.",
     "recommendation": "Перенести одну силовую линию с L1 или L2 на L3 (например «2 бойлер» 7.98А или «Бойлер» 5.9А) — это выравняет фазы до ~10-11А и снимет нейтраль с перегрузки."
   },
   "rebalanced_plan": {
     "description": "Перенос линии «2 бойлер холод очистка скважина» (L2-01, 7.98А) с фазы L2 на L3. Напряжение — оценка по наблюдаемой зависимости U(I) на этом щите, не точный расчёт.",
     "phase_metrics": {
       "L1": {
-        "voltage_avg_v": 195.1,
-        "voltage_min_v": 186.4,
-        "voltage_max_v": 210.7,
-        "total_current_a": 15.95,
-        "total_power_w": 3360.5,
-        "device_count": 8
+        "voltage_avg_v": 194.9,
+        "voltage_min_v": 186.2,
+        "voltage_max_v": 210.5,
+        "total_current_a": 16.04,
+        "total_power_w": 3363.2,
+        "device_count": 9
       },
       "L2": {
-        "voltage_avg_v": 207.2,
-        "voltage_min_v": 205.2,
-        "voltage_max_v": 217.2,
-        "total_current_a": 7.67,
-        "total_power_w": 1322.3,
-        "device_count": 9
+        "voltage_avg_v": 207.3,
+        "voltage_min_v": 205.3,
+        "voltage_max_v": 217.3,
+        "total_current_a": 7.57,
+        "total_power_w": 1319.6,
+        "device_count": 8
       },
       "L3": {
         "voltage_avg_v": 205.8,
@@ -85,7 +85,7 @@
       }
     },
     "asymmetry": {
-      "phase_voltage_spread_v": 12.1
+      "phase_voltage_spread_v": 12.4
     }
   },
   "devices": [
@@ -451,9 +451,9 @@
       "voltage_min_limit_v": 180
     },
     {
-      "id": "L2-03",
+      "id": "L1-08",
       "name": "Скважина",
-      "phase": "L2",
+      "phase": "L1",
       "category": "pumps",
       "type": "smart_breaker_sy2",
       "rated_current_a": 16,
@@ -464,9 +464,9 @@
       "state": "ON",
       "load_percent": 0.6,
       "alert_level": "warning",
-      "din_rail": 3,
-      "din_position": 3,
-      "notes": "Внимание! Повышенная температура 44°C при минимальном токе",
+      "din_rail": 2,
+      "din_position": 8,
+      "notes": "Насосная группа скважины (подтверждено: физически на одной линии с Мишень/красная розетка/Насос, L1). Внимание: повышенная температура 44°C при минимальном токе",
       "tuya_device_id": "bfa92f1867b9adfb9d6co0",
       "temp_limit_c": 65,
       "voltage_max_limit_v": 250,
