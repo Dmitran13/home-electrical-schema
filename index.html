@@ -120,7 +120,7 @@
               <span class="w-3 h-3 rounded-full bg-rose-500 alert-pulse"></span>
               <h3 class="font-bold text-base text-rose-400">ФАЗА 1 (L1)</h3>
             </div>
-            <p class="text-xs text-slate-400">Котёл, насос, гардероб</p>
+            <p class="text-xs text-slate-400">Котёл, скважина, насос, гардероб</p>
           </div>
           <span class="text-xs font-bold px-2 py-1 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">ПЕРЕГРУЗ</span>
         </div>
@@ -162,7 +162,7 @@
               <span class="w-3 h-3 rounded-full bg-emerald-400"></span>
               <h3 class="font-bold text-base text-emerald-400">ФАЗА 2 (L2)</h3>
             </div>
-            <p class="text-xs text-slate-400">Бойлер, скважина, свет, спальни</p>
+            <p class="text-xs text-slate-400">Бойлер, свет, спальни</p>
           </div>
           <span class="text-xs font-bold px-2 py-1 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">НОРМА</span>
         </div>
@@ -318,44 +318,42 @@
         <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-800 space-y-2">
           <div class="text-xs font-bold text-rose-400 flex items-center gap-2">
             <span class="w-6 h-6 rounded-full bg-rose-500/20 flex items-center justify-center">1</span>
-            Перенос ТЭНа котла на Фазу 3
+            Перенос «2 бойлер холод очистка скважина» на Фазу 3
           </div>
           <p class="text-xs text-slate-300">
-            Переключить кабель питания «3 котёл насос 1тэн» (14.99 А / 3.1 кВт) с фазной шины L1 на L3.
+            Переключить кабель питания линии «2 бойлер холод очистка скважина» (7.98 А / 1.5 кВт) с фазной шины L2 на L3.
           </p>
           <div class="text-[11px] text-emerald-400 font-mono bg-slate-950 p-2 rounded">
-            L1 разгрузится: 15.0А → 0.0А<br>
-            L3 нагрузится: 0.4А → 15.4А<br>
-            Напряжение L1 вырастет до ~225 В!
+            L2 разгрузится: 15.55А → 7.57А<br>
+            L3 нагрузится: 0.61А → 8.59А<br>
+            Оценка разброса напряжений: 43.7В → ~12.4В (не идеал — L1 с котлом не трогаем)
           </div>
         </div>
 
         <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-800 space-y-2">
           <div class="text-xs font-bold text-amber-400 flex items-center gap-2">
             <span class="w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center">2</span>
-            Перенос Бойлера ГВС на Фазу 1
+            РКН L1 и РКН L2 — у порога отключения
           </div>
           <p class="text-xs text-slate-300">
-            Перенести накопительный водонагреватель (до 2 кВт / ~9 А в активном режиме) с шины L2 на L1.
+            Обе фазы сейчас в 0.1–0.7В от уставки Umin=195В. Любое доп. включение может вызвать ложное отключение.
           </p>
           <div class="text-[11px] text-emerald-400 font-mono bg-slate-950 p-2 rounded">
-            Выравнивание активных потребителей:<br>
-            L1: Бойлер (9А)<br>
-            L2: Бытовая техника & насос (~8А)<br>
-            L3: Электрокотёл (~15А в мороз)
+            После переноса линии выше — запас у L2 вырастет (~207В).<br>
+            L1 (16.04А, котёл) остаётся без запаса — переразводка проводки котла, не часть этого плана.
           </div>
         </div>
 
         <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-800 space-y-2">
           <div class="text-xs font-bold text-violet-400 flex items-center gap-2">
             <span class="w-6 h-6 rounded-full bg-violet-500/20 flex items-center justify-center">3</span>
-            Ревизия автомата «Скважина» (43°C)
+            Ревизия автомата «Скважина» (44°C)
           </div>
           <p class="text-xs text-slate-300">
-            Затянуть винтовые клеммы автомата «Скважина» динамометрической отверткой (2.5 Н·м).
+            Затянуть винтовые клеммы автомата «Скважина» (Фаза 1, L1-08) динамометрической отверткой (2.5 Н·м).
           </p>
           <div class="text-[11px] text-amber-300 font-mono bg-slate-950 p-2 rounded">
-            При токе 0.096А нагрев до 43°C указывает на переходное сопротивление в контактах!
+            При токе 0.096А нагрев до 44°C указывает на переходное сопротивление в контактах!
           </div>
         </div>
       </div>
