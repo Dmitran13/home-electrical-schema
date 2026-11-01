@@ -26,17 +26,17 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Пороги предупреждений и аварий
-VOLTAGE_LOW_CRITICAL = 198.0   # В
-VOLTAGE_LOW_WARNING = 205.0    # В
-VOLTAGE_HIGH_WARNING = 240.0   # В
-VOLTAGE_HIGH_CRITICAL = 250.0  # В
+# Пороги предупреждений и аварий (согласованы с реальными уставками alarm_set_1 / alarm_set_2 в щите)
+VOLTAGE_LOW_CRITICAL = 170.0   # В — критическая просадка (уставка отключения в Tongou 160-175В)
+VOLTAGE_LOW_WARNING = 178.0    # В — предупреждение о просадке перед отсечкой
+VOLTAGE_HIGH_WARNING = 250.0   # В — предупреждение о повышении напряжения
+VOLTAGE_HIGH_CRITICAL = 255.0  # В — порог аварии (уставка отключения в Tongou 255В)
 
-CURRENT_LOAD_WARN_PCT = 80.0   # % от номинала автомата
-CURRENT_LOAD_CRIT_PCT = 90.0   # % от номинала автомата
+CURRENT_LOAD_WARN_PCT = 80.0   # % от номинала/уставки автомата
+CURRENT_LOAD_CRIT_PCT = 90.0   # % от номинала/уставки автомата
 
-TEMP_WARN_C = 42.0             # °C — гигиенический порог нагрева корпуса (WARNING)
-TEMP_CRIT_C = 50.0             # °C
+TEMP_WARN_C = 58.0             # °C — порог предупреждения о нагреве корпуса (уставка отключения 65-70°C)
+TEMP_CRIT_C = 65.0             # °C — критический нагрев перед сработкой защиты
 
 # Коды DPS автоматов Tuya SY2. Проверьте реальные коды своего устройства
 # в Tuya IoT Platform (Cloud -> API Explorer -> Device Status) и поправьте здесь.
@@ -269,9 +269,9 @@ class PhaseAnalyzer:
                     "message": f"Высокая нагрузка автомата: {i_act:.2f}A / {i_rated}A ({load_pct:.1f}%)"
                 })
 
-            # CRITICAL — по уставке самого автомата (он реально отключится),
-            # WARNING — по гигиеническому порогу: нагрев при малом токе тоже аномалия.
+            # Температурная защита
             temp_limit = dev.get("temp_limit_c")
+            temp_warn = (temp_limit - 8.0) if temp_limit else TEMP_WARN_C
             if temp_limit and temp >= temp_limit:
                 alerts.append({
                     "level": "CRITICAL",
@@ -279,20 +279,21 @@ class PhaseAnalyzer:
                     "phase": ph,
                     "message": f"Перегрев: {temp}°C — уставка отключения автомата {temp_limit}°C"
                 })
-            elif temp >= TEMP_WARN_C:
+            elif temp >= temp_warn:
                 alerts.append({
                     "level": "WARNING",
                     "device": dev["name"],
                     "phase": ph,
-                    "message": f"Повышенная температура корпуса: {temp}°C (порог {TEMP_WARN_C}°C)"
+                    "message": f"Повышенная температура корпуса: {temp}°C (порог {temp_warn:.0f}°C, уставка {temp_limit or 65}°C)"
                 })
 
             # Проверка напряжения (только для однофазных линий)
             if ph != "3P":
-                # CRITICAL — напряжение дошло до уставки отключения автомата, если она
-                # известна, иначе до общего критического порога.
                 u_min_trip = dev.get("voltage_min_limit_v") or VOLTAGE_LOW_CRITICAL
                 u_max_trip = dev.get("voltage_max_limit_v") or VOLTAGE_HIGH_CRITICAL
+                u_min_warn = min(VOLTAGE_LOW_WARNING, u_min_trip + 5.0)
+                u_max_warn = max(VOLTAGE_HIGH_WARNING, u_max_trip - 5.0)
+
                 if u_act <= u_min_trip:
                     alerts.append({
                         "level": "CRITICAL",
@@ -300,12 +301,12 @@ class PhaseAnalyzer:
                         "phase": ph,
                         "message": f"Просадка напряжения: {u_act:.1f}В — уставка отключения {u_min_trip}В"
                     })
-                elif u_act <= VOLTAGE_LOW_WARNING:
+                elif u_act <= u_min_warn:
                     alerts.append({
                         "level": "WARNING",
                         "device": dev["name"],
                         "phase": ph,
-                        "message": f"Просадка напряжения на линии: {u_act:.1f}В"
+                        "message": f"Просадка напряжения на линии: {u_act:.1f}В (уставка отключения {u_min_trip}В)"
                     })
                 elif u_act >= u_max_trip:
                     alerts.append({
@@ -314,12 +315,12 @@ class PhaseAnalyzer:
                         "phase": ph,
                         "message": f"Повышение напряжения: {u_act:.1f}В — уставка отключения {u_max_trip}В"
                     })
-                elif u_act >= VOLTAGE_HIGH_WARNING:
+                elif u_act >= u_max_warn:
                     alerts.append({
                         "level": "WARNING",
                         "device": dev["name"],
                         "phase": ph,
-                        "message": f"Опасное повышение напряжения на линии: {u_act:.1f}В"
+                        "message": f"Опасное повышение напряжения на линии: {u_act:.1f}В (уставка отключения {u_max_trip}В)"
                     })
 
         # Сводка по фазам
@@ -403,7 +404,7 @@ def sync_summary_into_schema(schema: Dict[str, Any], analysis: Dict[str, Any]):
         })
 
     asym = schema.setdefault("asymmetry_analysis", {})
-    asym["phase_voltage_spread_v"] = analysis["voltage_spread_v"]
+    asym[["phase_voltage_spread_v"]] = analysis["voltage_spread_v"]
     asym["current_unbalance_ratio_pct"] = analysis["current_unbalance_pct"]
     asym["risk_level"] = "HIGH" if analysis["voltage_spread_v"] >= 15 else ("MEDIUM" if analysis["voltage_spread_v"] >= 8 else "LOW")
 
