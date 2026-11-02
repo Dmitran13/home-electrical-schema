@@ -55,6 +55,7 @@
             </span>
           </h1>
           <p class="text-xs text-slate-400">Ввод 380/220V 15 кВт • <span id="header-device-count">33</span> элемента схемы • Dmitran13</p>
+          <p class="text-xs text-slate-500 font-mono" id="header-version"></p>
         </div>
       </div>
 
@@ -410,9 +411,21 @@
 
   <footer class="border-t border-slate-800 py-6 text-center text-xs text-slate-500">
     <p>Репозиторий проекта: <a href="https://github.com/Dmitran13/home-electrical-schema" class="text-indigo-400 hover:underline">Dmitran13/home-electrical-schema</a> • Данные синхронизированы с Tuya SY2</p>
+    <p class="mt-1 font-mono" id="build-stamp"></p>
   </footer>
 
   <script>
+    // Метку подставляет deploy-electro.sh при каждом деплое (git-коммит + время);
+    // если страница открыта не через деплой-скрипт, плейсхолдер остаётся как есть.
+    const BUILD_STAMP = '__DEPLOY_BUILD__';
+    (function renderBuildStamp() {
+      const el = document.getElementById('build-stamp');
+      if (!el) return;
+      el.textContent = BUILD_STAMP.startsWith('__')
+        ? 'сборка: локальная копия (не через деплой-скрипт)'
+        : 'сборка: ' + BUILD_STAMP;
+    })();
+
     // Исходные данные схемы (33 устройства)
     let rawData = null;
     let currentFilter = 'all';
@@ -455,6 +468,15 @@
 
     function renderDashboard() {
       if (!rawData) return;
+
+      const versionEl = document.getElementById('header-version');
+      if (versionEl) {
+        const ver = rawData.version ? `вер. ${rawData.version}` : '';
+        const upd = rawData.updated_at
+          ? 'данные от ' + new Date(rawData.updated_at).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' })
+          : '';
+        versionEl.textContent = [ver, upd].filter(Boolean).join(' • ');
+      }
 
       const isRebalanced = (currentMode === 'rebalanced');
       const alertBox = document.getElementById('imbalance-alert-box');

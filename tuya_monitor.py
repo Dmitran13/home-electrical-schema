@@ -183,6 +183,36 @@ class TuyaCloudClient:
             print(f"[Tuya Device Query Error] {device_id}: {e}", file=sys.stderr)
             return None
 
+    def get_device_info(self, device_id: str) -> Optional[Dict[str, Any]]:
+        """Запрос общей информации об устройстве (имя/нейм в приложении Tuya), а не DPS-статусов.
+        Используется отдельно от get_device_status — имя автомат не передаёт в телеметрии."""
+        import urllib.request
+        if not self.access_token or time.time() > self.token_expire_time:
+            if not self.authenticate():
+                return None
+
+        t = str(int(time.time() * 1000))
+        path = f"/v1.0/devices/{device_id}"
+        sign = self._calc_sign("GET", path, t)
+
+        req = urllib.request.Request(f"{self.base_url}{path}")
+        req.add_header("client_id", self.client_id)
+        req.add_header("access_token", self.access_token)
+        req.add_header("sign", sign)
+        req.add_header("t", t)
+        req.add_header("sign_method", "HMAC-SHA256")
+
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                if data.get("success"):
+                    return data.get("result")
+                print(f"[Tuya API Error] {device_id}: {data.get('msg')}", file=sys.stderr)
+                return None
+        except Exception as e:
+            print(f"[Tuya Device Query Error] {device_id}: {e}", file=sys.stderr)
+            return None
+
 
 def apply_dps_to_device(dev: Dict[str, Any], dps: Dict[str, Any]) -> bool:
     """Обновляет поля устройства из свежих DPS-статусов Tuya. Возвращает True при изменениях."""
@@ -234,6 +264,26 @@ def sync_live_devices(client: "TuyaCloudClient", schema: Dict[str, Any]) -> tupl
     return synced, attempted
 
 
+def sync_device_names(client: "TuyaCloudClient", schema: Dict[str, Any]) -> list:
+    """Опрашивает Tuya Cloud за актуальным именем (как в приложении Tuya) для устройств
+    с заполненным tuya_device_id и обновляет dev["name"] при расхождении.
+    Возвращает список изменений (id, старое имя, новое имя) для вывода пользователю."""
+    changes = []
+    for dev in schema.get("devices", []):
+        device_id = dev.get("tuya_device_id")
+        if not device_id:
+            continue
+        info = client.get_device_info(device_id)
+        if not info:
+            continue
+        new_name = info.get("name")
+        old_name = dev.get("name")
+        if new_name and new_name != old_name:
+            changes.append((dev.get("id"), old_name, new_name))
+            dev["name"] = new_name
+    return changes
+
+
 class PhaseAnalyzer:
     """Анализ асимметрии напряжений, токов и рисков перекоса фаз."""
 
@@ -244,7 +294,12 @@ class PhaseAnalyzer:
 
         for dev in schema_data.get("devices", []):
             ph = dev.get("phase")
-            if ph in phases:
+            # Автоматы уличного щитка (до АВР) сидят на другом электрическом узле —
+            # не после QD1, а напрямую со столба. Включать их показания в расчёт
+            # перекоса фаз домового щита (L1/L2/L3 после QD1) нельзя: это другая точка
+            # замера, смешивание исказит ключевую метрику ΔU. Индивидуальные алерты
+            # по ним (ниже) всё равно считаются.
+            if ph in phases and dev.get("location") != "street_panel_pre_ats":
                 phases[ph].append(dev)
 
             # Проверка индивидуальных перегрузок
@@ -404,7 +459,7 @@ def sync_summary_into_schema(schema: Dict[str, Any], analysis: Dict[str, Any]):
         })
 
     asym = schema.setdefault("asymmetry_analysis", {})
-    asym[["phase_voltage_spread_v"]] = analysis["voltage_spread_v"]
+    asym["phase_voltage_spread_v"] = analysis["voltage_spread_v"]
     asym["current_unbalance_ratio_pct"] = analysis["current_unbalance_pct"]
     asym["risk_level"] = "HIGH" if analysis["voltage_spread_v"] >= 15 else ("MEDIUM" if analysis["voltage_spread_v"] >= 8 else "LOW")
 
@@ -617,6 +672,10 @@ def main():
     parser.add_argument("--rebalance-plan", action="store_true", help="Вывести план перебалансировки щита")
     parser.add_argument("--daemon", action="store_true", help="Запуск в режиме непрерывного мониторинга")
     parser.add_argument("--interval", type=int, default=10, help="Интервал опроса в режиме демона (сек)")
+    parser.add_argument("--sync-names", action="store_true",
+                         help="Разовый опрос реальных имён автоматов из Tuya Cloud (как переименовано в приложении) "
+                              "и запись в schema_data.json/--export. Не используется в --daemon — имена меняются "
+                              "редко и вручную, незачем дёргать лишний API-запрос на каждом цикле опроса.")
     args = parser.parse_args()
 
     # Поиск пути к schema_data.json
@@ -670,6 +729,17 @@ def main():
                       f"[Tuya API Error]/[Tuya Device Query Error] выше. Используются локальные данные.{Colors.RESET}")
             else:
                 print(f"{Colors.YELLOW}[SYNC] Нет устройств с полем tuya_device_id — используются локальные данные.{Colors.RESET}")
+
+            if args.sync_names:
+                name_changes = sync_device_names(client, schema)
+                if name_changes:
+                    print(f"{Colors.CYAN}[SYNC-NAMES] Переименовано в Tuya Cloud, обновляю:{Colors.RESET}")
+                    for dev_id, old_name, new_name in name_changes:
+                        print(f"  {dev_id}: {old_name!r} -> {new_name!r}")
+                else:
+                    print(f"{Colors.CYAN}[SYNC-NAMES] Расхождений с Tuya Cloud не найдено.{Colors.RESET}")
+        elif args.sync_names:
+            print(f"{Colors.RED}[SYNC-NAMES] Нет подключения к Tuya Cloud — имена не опрошены.{Colors.RESET}")
 
         analysis = PhaseAnalyzer.evaluate(schema)
         print_dashboard(analysis)
