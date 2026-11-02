@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Редактор топологии щита</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+  :root { color-scheme: dark; }
+  body { background:#0b0f1a; }
+  .card { touch-action: none; }
+  .card.dragging { opacity: 0.35; }
+  .lane.dragover { outline: 2px dashed #6366f1; outline-offset: -4px; }
+</style>
+</head>
+<body class="text-slate-200 font-sans">
+
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap justify-between items-center gap-3">
+      <div>
+        <h1 class="text-lg font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-diagram-project"></i> Редактор топологии щита
+        </h1>
+        <p class="text-xs text-slate-400">Группировка по линиям (фазам) — как на главном дашборде. Тащи карточки между линиями и внутри линии, щёлкай по бейджу щитка, чтобы сменить панель.</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <a href="index.html" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm">← Дашборд</a>
+        <button onclick="saveTopology()" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold">
+          💾 Сохранить в schema_data.json
+        </button>
+      </div>
+    </div>
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 pb-2">
+      <p id="status" class="text-xs text-slate-500"></p>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 sm:px-6 py-5 space-y-4">
+    <div id="lanes" class="space-y-4"></div>
+    <p class="text-[11px] text-slate-600">
+      Бейдж щитка на карточке: 🏠 домовой щиток (после QF1/QD1) · 🚪 уличный щиток, ДО АВР (не резервируется генератором) · 🅿️ парковочный щиток (запитан фидером «Парковка»). Клик — переключить.
+    </p>
+  </main>
+
+<script>
+  const SCHEMA_URL = 'schema_data.json?t=' + Date.now();
+  const SAVE_URL = 'topology-save';
+
+  // Единая группировка "по линиям" — как на главном дашборде (index.html → renderTopology).
+  // '3P' — общий трёхфазный ввод (уличные автоматы, АВР, генератор, QF1, QD1): у них нет
+  // одной конкретной фазы, поэтому это отдельная "линия", а не L1/L2/L3.
+  const LANES = [
+    { key: '3P', title: 'Ввод (3P) — уличные автоматы, АВР, генератор, QF1, QD1', accent: 'slate' },
+    { key: 'L1', title: 'Линия L1', accent: 'rose' },
+    { key: 'L2', title: 'Линия L2', accent: 'emerald' },
+    { key: 'L3', title: 'Линия L3', accent: 'violet' },
+  ];
+
+  const ACCENT = {
+    slate: { border: 'border-slate-600/50', bg: 'bg-slate-900/40', text: 'text-slate-300' },
+    rose: { border: 'border-rose-500/40', bg: 'bg-rose-950/20', text: 'text-rose-300' },
+    emerald: { border: 'border-emerald-500/40', bg: 'bg-emerald-950/20', text: 'text-emerald-300' },
+    violet: { border: 'border-violet-500/40', bg: 'bg-violet-950/20', text: 'text-violet-300' },
+  };
+
+  // location → (бейдж, следующий location по клику, din_rail для сохранения)
+  const LOCATIONS = [
+    { key: null, badge: '🏠', title: 'Домовой щиток (Щиток 2)', rail: 2 },
+    { key: 'street_panel_pre_ats', badge: '🚪', title: 'Уличный щиток, ДО АВР (Щиток 1) — не резервируется генератором', rail: 0 },
+    { key: 'parking_subpanel', badge: '🅿️', title: 'Парковочный щиток (Щиток 3), фидер «Парковка»', rail: 6 },
+  ];
+
+  let devices = [];
+  let dirty = false;
+
+  async function load() {
+    const status = document.getElementById('status');
+    try {
+      const resp = await fetch(SCHEMA_URL, { cache: 'no-store' });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const data = await resp.json();
+      devices = data.devices || [];
+      status.textContent = 'Загружено ' + devices.length + ' узлов (данные от ' + (data.updated_at || '?') + ')';
+      render();
+    } catch (e) {
+      status.textContent = 'Не удалось загрузить schema_data.json: ' + e.message;
+      status.className = 'text-xs text-rose-400';
+    }
+  }
+
+  function locationInfo(dev) {
+    return LOCATIONS.find(l => l.key === (dev.location || null)) || LOCATIONS[0];
+  }
+
+  function render() {
+    const root = document.getElementById('lanes');
+    root.innerHTML = '';
+    LANES.forEach(lane => root.appendChild(renderLane(lane)));
+  }
+
+  function renderLane(lane) {
+    const ac = ACCENT[lane.accent];
+    const laneDevs = devices
+      .filter(d => (d.phase || '3P') === lane.key)
+      .sort((a, b) => (a.din_position ?? 0) - (b.din_position ?? 0));
+
+    const wrap = document.createElement('div');
+    wrap.className = `lane rounded-2xl border ${ac.border} ${ac.bg} p-3`;
+    wrap.dataset.lane = lane.key;
+    wrap.ondragover = onLaneDragOver;
+    wrap.ondragleave = onLaneDragLeave;
+    wrap.ondrop = onLaneDrop;
+
+    const title = document.createElement('div');
+    title.className = `font-bold ${ac.text} text-sm mb-2`;
+    title.textContent = lane.title + ' (' + laneDevs.length + ')';
+    wrap.appendChild(title);
+
+    const list = document.createElement('div');
+    list.className = 'flex flex-wrap gap-1.5 min-h-[40px]';
+    laneDevs.forEach(dev => list.appendChild(makeCard(dev)));
+    wrap.appendChild(list);
+    return wrap;
+  }
+
+  function makeCard(dev) {
+    const loc = locationInfo(dev);
+    const hasTelemetry = dev.type === 'smart_breaker_sy2';
+
+    const el = document.createElement('div');
+    el.className = 'card flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-slate-800 border border-slate-700 cursor-grab text-xs';
+    el.draggable = true;
+    el.dataset.id = dev.id;
+
+    if (hasTelemetry) {
+      const dot = document.createElement('span');
+      dot.className = 'w-2 h-2 rounded-full flex-shrink-0 ' + (dev.state === 'OFF' ? 'bg-slate-600' : 'bg-emerald-400');
+      el.appendChild(dot);
+    }
+
+    const name = document.createElement('span');
+    name.className = 'truncate max-w-[160px] font-medium';
+    name.title = dev.name + ' (' + dev.id + ')';
+    name.textContent = dev.name;
+    el.appendChild(name);
+
+    const locBtn = document.createElement('button');
+    locBtn.className = 'px-1 rounded text-xs leading-none';
+    locBtn.textContent = loc.badge;
+    locBtn.title = loc.title + ' — клик, чтобы сменить щиток';
+    locBtn.onclick = (e) => {
+      e.stopPropagation();
+      const i = LOCATIONS.findIndex(l => l.key === (dev.location || null));
+      const next = LOCATIONS[(i + 1) % LOCATIONS.length];
+      if (next.key) dev.location = next.key; else delete dev.location;
+      dev.din_rail = next.rail;
+      if (next.key === 'parking_subpanel') dev.fed_by = dev.fed_by || 'L1-08';
+      else delete dev.fed_by;
+      markDirty();
+      render();
+    };
+    el.appendChild(locBtn);
+
+    el.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('text/plain', dev.id);
+      el.classList.add('dragging');
+    });
+    el.addEventListener('dragend', () => el.classList.remove('dragging'));
+    return el;
+  }
+
+  function onLaneDragOver(e) {
+    e.preventDefault();
+    e.currentTarget.classList.add('dragover');
+    const list = e.currentTarget.querySelector('.flex');
+    const dragging = document.querySelector('.card.dragging');
+    if (!dragging) return;
+    const afterEl = [...list.querySelectorAll('.card:not(.dragging)')].find(card => {
+      const rect = card.getBoundingClientRect();
+      return e.clientY < rect.top + rect.height / 2 ||
+             (e.clientY < rect.bottom && e.clientX < rect.left + rect.width / 2);
+    });
+    if (afterEl) list.insertBefore(dragging, afterEl);
+    else list.appendChild(dragging);
+  }
+
+  function onLaneDragLeave(e) {
+    if (e.currentTarget === e.target) e.currentTarget.classList.remove('dragover');
+  }
+
+  function onLaneDrop(e) {
+    e.preventDefault();
+    const lane = e.currentTarget;
+    lane.classList.remove('dragover');
+    const id = e.dataTransfer.getData('text/plain');
+    const dev = devices.find(d => d.id === id);
+    if (!dev) return;
+
+    const laneKey = lane.dataset.lane;
+    dev.phase = laneKey;
+
+    const list = lane.querySelector('.flex');
+    [...list.querySelectorAll('.card')].forEach((card, idx) => {
+      const d = devices.find(x => x.id === card.dataset.id);
+      if (d) d.din_position = idx + 1;
+    });
+
+    markDirty();
+    render();
+  }
+
+  function markDirty() {
+    dirty = true;
+    const status = document.getElementById('status');
+    status.textContent = 'Есть несохранённые изменения — нажми «Сохранить в schema_data.json»';
+    status.className = 'text-xs text-amber-400';
+  }
+
+  async function saveTopology() {
+    const status = document.getElementById('status');
+    status.textContent = 'Сохраняю...';
+    status.className = 'text-xs text-slate-400';
+    const payload = {
+      devices: devices.map(d => ({
+        id: d.id,
+        phase: d.phase,
+        din_rail: d.din_rail,
+        din_position: d.din_position,
+        location: d.location ?? null,
+        fed_by: d.fed_by ?? null,
+      })),
+    };
+    try {
+      const resp = await fetch(SAVE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const result = await resp.json();
+      if (!resp.ok || !result.ok) throw new Error(result.error || ('HTTP ' + resp.status));
+      dirty = false;
+      status.textContent = 'Сохранено (' + result.updated + ' узлов) — ' + new Date().toLocaleTimeString('ru-RU');
+      status.className = 'text-xs text-emerald-400';
+    } catch (e) {
+      status.textContent = 'Ошибка сохранения: ' + e.message;
+      status.className = 'text-xs text-rose-400';
+    }
+  }
+
+  window.addEventListener('beforeunload', (e) => {
+    if (dirty) { e.preventDefault(); e.returnValue = ''; }
+  });
+
+  load();
+</script>
+</body>
+</html>

@@ -24,7 +24,7 @@ sed "s/__DEPLOY_BUILD__/$BUILD_STAMP/" "$PROJECT_DIR/index.html" > "$TMP_INDEX"
 # с rsync (delta-sync) не ощущается — каждый деплой просто перезаливает их целиком.
 scp "$TMP_INDEX" "$SERVER:$DEPLOY_DIR/index.html"
 rm -f "$TMP_INDEX"
-scp "$PROJECT_DIR/electrical_schema.svg" \
+scp "$PROJECT_DIR/electrical_schema.svg" "$PROJECT_DIR/topology.html" \
   "$PROJECT_DIR/refresh_server.py" "$PROJECT_DIR/tuya_monitor.py" "$SERVER:$DEPLOY_DIR/"
 echo "  Метка деплоя: $BUILD_STAMP"
 
