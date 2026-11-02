@@ -70,6 +70,9 @@
           </button>
         </div>
 
+        <a href="topology.html" title="Редактор топологии щита" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
+          <i class="fa-solid fa-diagram-project text-sm"></i>
+        </a>
         <button onclick="refreshData()" title="Синхронизировать с Tuya Cloud" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
           <i class="fa-solid fa-rotate text-sm" id="refresh-icon"></i>
         </button>
@@ -641,6 +644,49 @@
       L3: { text: 'text-violet-300', border: 'border-violet-500/40', bg: 'bg-violet-500/10', dot: 'bg-violet-500' },
     };
 
+    // Повторяет пороги PhaseAnalyzer.evaluate() из tuya_monitor.py — чтобы подсветка на
+    // дашборде совпадала с реальными уставками автомата (temp_limit_c/voltage_*_limit_v),
+    // а не с произвольным захардкоженным числом вроде "temperature_c >= 42", которое
+    // подсвечивало штатный нагрев (42-43°C при уставке отключения 65-70°C) как тревогу.
+    const CURRENT_LOAD_WARN_PCT = 80.0;
+    const CURRENT_LOAD_CRIT_PCT = 90.0;
+    const TEMP_WARN_C = 58.0;
+    const VOLTAGE_LOW_CRITICAL = 170.0;
+    const VOLTAGE_LOW_WARNING = 178.0;
+    const VOLTAGE_HIGH_WARNING = 250.0;
+    const VOLTAGE_HIGH_CRITICAL = 255.0;
+
+    function tempLevel(dev) {
+      const limit = dev.temp_limit_c;
+      const warn = limit ? limit - 8.0 : TEMP_WARN_C;
+      if (limit && dev.temperature_c >= limit) return 'critical';
+      if (dev.temperature_c >= warn) return 'warning';
+      return 'normal';
+    }
+
+    function deviceStatus(dev) {
+      let level = 'normal';
+      const bump = (lvl) => { if (lvl === 'critical' || (lvl === 'warning' && level !== 'critical')) level = lvl; };
+
+      const iRated = dev.rated_current_a || 16;
+      const loadPct = iRated > 0 ? (dev.current_a / iRated * 100) : 0;
+      if (loadPct >= CURRENT_LOAD_CRIT_PCT) bump('critical');
+      else if (loadPct >= CURRENT_LOAD_WARN_PCT) bump('warning');
+
+      bump(tempLevel(dev));
+
+      if (dev.phase !== '3P') {
+        const uMinTrip = dev.voltage_min_limit_v || VOLTAGE_LOW_CRITICAL;
+        const uMaxTrip = dev.voltage_max_limit_v || VOLTAGE_HIGH_CRITICAL;
+        const uMinWarn = Math.min(VOLTAGE_LOW_WARNING, uMinTrip + 5.0);
+        const uMaxWarn = Math.max(VOLTAGE_HIGH_WARNING, uMaxTrip - 5.0);
+        const u = dev.voltage_v;
+        if (u <= uMinTrip || u >= uMaxTrip) bump('critical');
+        else if (u <= uMinWarn || u >= uMaxWarn) bump('warning');
+      }
+      return level;
+    }
+
     function topoLine(short) {
       return `<div class="w-0.5 ${short ? 'h-3' : 'h-5'} bg-slate-700"></div>`;
     }
@@ -675,9 +721,8 @@
       const breakerNode = dev => {
         const st = PHASE_STYLE[dev.phase] || PHASE_STYLE.L1;
         const isOff = dev.state === 'OFF';
-        const isCritical = dev.alert_level === 'critical';
-        const isWarning = dev.alert_level === 'warning' || dev.temperature_c >= 42;
-        const dot = isOff ? 'bg-slate-600' : (isCritical ? 'bg-rose-500 alert-pulse' : (isWarning ? 'bg-amber-400' : 'bg-emerald-400'));
+        const status = deviceStatus(dev);
+        const dot = isOff ? 'bg-slate-600' : (status === 'critical' ? 'bg-rose-500 alert-pulse' : (status === 'warning' ? 'bg-amber-400' : 'bg-emerald-400'));
         return `
           <div data-topo-dev-id="${dev.id}" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700 hover:border-indigo-500/60 cursor-pointer text-xs whitespace-nowrap">
             <span class="w-2 h-2 rounded-full ${dot} flex-shrink-0"></span>
@@ -691,7 +736,7 @@
         const relay = relayByPhase(ph);
         const breakers = devices
           .filter(d => d.phase === ph && d.category !== 'protection')
-          .sort((a, b) => (a.din_rail - b.din_rail) || (a.din_position - b.din_position));
+          .sort((a, b) => (a.din_position ?? 0) - (b.din_position ?? 0));
         return `
           <div class="flex flex-col items-center min-w-[180px]">
             ${topoLine(true)}
@@ -746,7 +791,7 @@
       const devices = rawData.devices;
       const total = devices.length;
       const byPhase = ph => devices.filter(d => d.phase === ph).length;
-      const alerts = devices.filter(d => d.alert_level === 'critical' || d.alert_level === 'warning' || d.temperature_c >= 42).length;
+      const alerts = devices.filter(d => deviceStatus(d) !== 'normal').length;
 
       document.getElementById('header-device-count').textContent = total;
       document.getElementById('grid-device-count').textContent = total;
@@ -763,14 +808,15 @@
 
       const devices = rawData.devices.filter(d => {
         if (currentFilter === 'all') return true;
-        if (currentFilter === 'alerts') return d.alert_level === 'critical' || d.alert_level === 'warning' || d.temperature_c >= 42;
+        if (currentFilter === 'alerts') return deviceStatus(d) !== 'normal';
         return d.phase === currentFilter;
       });
 
       devices.forEach(dev => {
         const card = document.createElement('div');
-        const isCritical = dev.alert_level === 'critical';
-        const isWarning = dev.alert_level === 'warning' || dev.temperature_c >= 42;
+        const status = deviceStatus(dev);
+        const isCritical = status === 'critical';
+        const isWarning = status === 'warning';
         const isOff = dev.state === 'OFF';
 
         let borderCol = 'border-slate-800';
@@ -819,8 +865,8 @@
             </div>
             <div>
               <div class="text-[10px] text-slate-400">Темп.</div>
-              <div class="font-mono font-bold ${dev.temperature_c >= 42 ? 'text-amber-400 flex items-center justify-center gap-0.5' : 'text-slate-200'}">
-                ${dev.temperature_c >= 42 ? '<i class="fa-solid fa-fire text-[9px]"></i>' : ''}${dev.temperature_c}°C
+              <div class="font-mono font-bold ${tempLevel(dev) !== 'normal' ? (tempLevel(dev) === 'critical' ? 'text-rose-400' : 'text-amber-400') + ' flex items-center justify-center gap-0.5' : 'text-slate-200'}">
+                ${tempLevel(dev) !== 'normal' ? '<i class="fa-solid fa-fire text-[9px]"></i>' : ''}${dev.temperature_c}°C${dev.temp_limit_c ? `<span class="text-[9px] text-slate-500 font-normal">/${dev.temp_limit_c}</span>` : ''}
               </div>
             </div>
           </div>
