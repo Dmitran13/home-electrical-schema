@@ -11,7 +11,7 @@
   body { background:#0b0f1a; }
   .card { touch-action: none; }
   .card.dragging { opacity: 0.35; }
-  .lane.dragover { outline: 2px dashed #6366f1; outline-offset: -4px; }
+  .drop-zone.dragover { outline: 2px dashed #6366f1; outline-offset: -4px; }
 </style>
 </head>
 <body class="text-slate-200 font-sans">
@@ -22,7 +22,7 @@
         <h1 class="text-lg font-bold text-white flex items-center gap-2">
           <i class="fa-solid fa-diagram-project"></i> Редактор топологии щита
         </h1>
-        <p class="text-xs text-slate-400">Группировка по линиям (фазам) — как на главном дашборде. Тащи карточки между линиями и внутри линии, щёлкай по бейджу щитка, чтобы сменить панель.</p>
+        <p class="text-xs text-slate-400">3 щитка, в каждом — колонки L1/L2/L3. Тащи карточки между колонками (меняет линию) и между щитками (меняет панель), внутри колонки — меняешь порядок.</p>
       </div>
       <div class="flex items-center gap-2">
         <a href="index.html" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm">← Дашборд</a>
@@ -36,40 +36,41 @@
     </div>
   </header>
 
-  <main class="max-w-6xl mx-auto px-4 sm:px-6 py-5 space-y-4">
-    <div id="lanes" class="space-y-4"></div>
-    <p class="text-[11px] text-slate-600">
-      Бейдж щитка на карточке: 🏠 домовой щиток (после QF1/QD1) · 🚪 уличный щиток, ДО АВР (не резервируется генератором) · 🅿️ парковочный щиток (запитан фидером «Парковка»). Клик — переключить.
-    </p>
+  <main class="max-w-6xl mx-auto px-4 sm:px-6 py-5 space-y-5">
+    <div id="panels" class="space-y-5"></div>
   </main>
 
 <script>
   const SCHEMA_URL = 'schema_data.json?t=' + Date.now();
   const SAVE_URL = 'topology-save';
 
-  // Единая группировка "по линиям" — как на главном дашборде (index.html → renderTopology).
-  // '3P' — общий трёхфазный ввод (уличные автоматы, АВР, генератор, QF1, QD1): у них нет
-  // одной конкретной фазы, поэтому это отдельная "линия", а не L1/L2/L3.
-  const LANES = [
-    { key: '3P', title: 'Ввод (3P) — уличные автоматы, АВР, генератор, QF1, QD1', accent: 'slate' },
-    { key: 'L1', title: 'Линия L1', accent: 'rose' },
-    { key: 'L2', title: 'Линия L2', accent: 'emerald' },
-    { key: 'L3', title: 'Линия L3', accent: 'violet' },
+  // Три физических щитка (поле location), внутри каждого — 3 колонки по линиям L1/L2/L3
+  // плюс отдельная строка сверху для узлов без конкретной фазы (3P: вводные автоматы,
+  // АВР, генератор, QF1, QD1).
+  const PANELS = [
+    { key: 'street_panel_pre_ats', title: 'Щиток 1 — за домом (ДО АВР, не резервируется генератором)', accent: 'sky', rail: 0 },
+    { key: null, title: 'Щиток 2 — в доме (после QF1/QD1)', accent: 'indigo', rail: 2 },
+    { key: 'parking_subpanel', title: 'Щиток 3 — на парковке (питается от «Парковка», L1-08)', accent: 'amber', rail: 6 },
   ];
+  const PHASES = ['L1', 'L2', 'L3'];
 
   const ACCENT = {
-    slate: { border: 'border-slate-600/50', bg: 'bg-slate-900/40', text: 'text-slate-300' },
-    rose: { border: 'border-rose-500/40', bg: 'bg-rose-950/20', text: 'text-rose-300' },
-    emerald: { border: 'border-emerald-500/40', bg: 'bg-emerald-950/20', text: 'text-emerald-300' },
-    violet: { border: 'border-violet-500/40', bg: 'bg-violet-950/20', text: 'text-violet-300' },
+    sky: { border: 'border-sky-500/40', bg: 'bg-sky-950/15', text: 'text-sky-300' },
+    indigo: { border: 'border-indigo-500/40', bg: 'bg-indigo-950/15', text: 'text-indigo-300' },
+    amber: { border: 'border-amber-500/40', bg: 'bg-amber-950/15', text: 'text-amber-300' },
+  };
+  const PHASE_COLOR = {
+    L1: { border: 'border-rose-500/30', text: 'text-rose-300' },
+    L2: { border: 'border-emerald-500/30', text: 'text-emerald-300' },
+    L3: { border: 'border-violet-500/30', text: 'text-violet-300' },
   };
 
-  // location → (бейдж, следующий location по клику, din_rail для сохранения)
-  const LOCATIONS = [
-    { key: null, badge: '🏠', title: 'Домовой щиток (Щиток 2)', rail: 2 },
-    { key: 'street_panel_pre_ats', badge: '🚪', title: 'Уличный щиток, ДО АВР (Щиток 1) — не резервируется генератором', rail: 0 },
-    { key: 'parking_subpanel', badge: '🅿️', title: 'Парковочный щиток (Щиток 3), фидер «Парковка»', rail: 6 },
-  ];
+  // Фиксированный физический порядок узлов "Общий ввод" — он не редактируется перетаскиванием
+  // (это реальная проводка, она всегда одна и та же), только отображается стрелочками.
+  const GENERAL_RANK = {
+    'STREET-IN1': 1, 'STREET-ATS': 2, 'STREET-GEN': 3, 'STREET-IN2': 4,
+    'DEV-MAIN-01': 5, 'DEV-RCD-01': 6,
+  };
 
   let devices = [];
   let dirty = false;
@@ -89,43 +90,108 @@
     }
   }
 
-  function locationInfo(dev) {
-    return LOCATIONS.find(l => l.key === (dev.location || null)) || LOCATIONS[0];
+  function devicesOf(panel, phase) {
+    // phase === null -> узлы без конкретной линии (3P: вводные, АВР, генератор, QF1, QD1)
+    return devices
+      .filter(d => (d.location || null) === panel.key && (phase ? d.phase === phase : (d.phase || '3P') === '3P'))
+      .sort((a, b) => (a.din_position ?? 0) - (b.din_position ?? 0));
   }
 
   function render() {
-    const root = document.getElementById('lanes');
+    const root = document.getElementById('panels');
     root.innerHTML = '';
-    LANES.forEach(lane => root.appendChild(renderLane(lane)));
+    PANELS.forEach((panel, i) => {
+      root.appendChild(renderPanel(panel));
+      if (i < PANELS.length - 1) root.appendChild(renderPanelConnector(panel, PANELS[i + 1]));
+    });
   }
 
-  function renderLane(lane) {
-    const ac = ACCENT[lane.accent];
-    const laneDevs = devices
-      .filter(d => (d.phase || '3P') === lane.key)
-      .sort((a, b) => (a.din_position ?? 0) - (b.din_position ?? 0));
+  function renderPanelConnector(fromPanel, toPanel) {
+    const el = document.createElement('div');
+    el.className = 'flex items-center justify-center gap-2 text-xs text-slate-500';
+    const label = toPanel.key === 'parking_subpanel'
+      ? 'питание ↓ через фидер «Парковка» (L1-08)'
+      : 'питание ↓';
+    el.innerHTML = `<span class="text-slate-600">┊</span><span>${label}</span><span class="text-slate-600">┊</span>`;
+    return el;
+  }
 
+  function renderPanel(panel) {
+    const ac = ACCENT[panel.accent];
     const wrap = document.createElement('div');
-    wrap.className = `lane rounded-2xl border ${ac.border} ${ac.bg} p-3`;
-    wrap.dataset.lane = lane.key;
-    wrap.ondragover = onLaneDragOver;
-    wrap.ondragleave = onLaneDragLeave;
-    wrap.ondrop = onLaneDrop;
+    wrap.className = `rounded-2xl border ${ac.border} ${ac.bg} p-4 space-y-3`;
 
-    const title = document.createElement('div');
-    title.className = `font-bold ${ac.text} text-sm mb-2`;
-    title.textContent = lane.title + ' (' + laneDevs.length + ')';
+    const total = devices.filter(d => (d.location || null) === panel.key).length;
+    const title = document.createElement('h2');
+    title.className = `font-bold ${ac.text}`;
+    title.textContent = panel.title + ' (' + total + ')';
     wrap.appendChild(title);
 
-    const list = document.createElement('div');
-    list.className = 'flex flex-wrap gap-1.5 min-h-[40px]';
-    laneDevs.forEach(dev => list.appendChild(makeCard(dev)));
-    wrap.appendChild(list);
+    // Общий ввод — порядок фиксирован физикой (это всегда одна и та же проводка),
+    // поэтому сортируем по известной последовательности и рисуем стрелочками, а не
+    // даём перетаскиванием менять порядок внутри строки. Перетащить узел СЮДА из
+    // другой колонки/щитка по-прежнему можно — это меняет щиток/линию, не порядок.
+    const threeP = devicesOf(panel, null)
+      .sort((a, b) => (GENERAL_RANK[a.id] ?? 99) - (GENERAL_RANK[b.id] ?? 99));
+    const dropRow = document.createElement('div');
+    dropRow.className = 'drop-zone rounded-xl border border-slate-700/50 bg-slate-900/30 p-2';
+    dropRow.dataset.panel = panel.key ?? '';
+    dropRow.dataset.phase = '';
+    dropRow.dataset.general = '1';
+    dropRow.ondragover = onDropZoneDragOver;
+    dropRow.ondragleave = onDropZoneDragLeave;
+    dropRow.ondrop = onDropZoneDrop;
+    const dropRowLabel = document.createElement('div');
+    dropRowLabel.className = 'text-[10px] text-slate-500 mb-1';
+    dropRowLabel.textContent = 'Общий ввод (без конкретной линии)' + (threeP.length ? '' : ' — пусто');
+    dropRow.appendChild(dropRowLabel);
+    const dropRowList = document.createElement('div');
+    dropRowList.className = 'flex flex-wrap items-center gap-1.5 min-h-[36px]';
+    threeP.forEach((dev, i) => {
+      if (i > 0) {
+        const arrow = document.createElement('span');
+        arrow.className = 'text-slate-600 text-xs flex-shrink-0';
+        arrow.textContent = '→';
+        dropRowList.appendChild(arrow);
+      }
+      dropRowList.appendChild(makeCard(dev));
+    });
+    dropRow.appendChild(dropRowList);
+    wrap.appendChild(dropRow);
+
+    const cols = document.createElement('div');
+    cols.className = 'grid grid-cols-1 md:grid-cols-3 gap-2';
+    PHASES.forEach(ph => cols.appendChild(renderPhaseColumn(panel, ph)));
+    wrap.appendChild(cols);
+
     return wrap;
   }
 
+  function renderPhaseColumn(panel, phase) {
+    const pc = PHASE_COLOR[phase];
+    const colDevs = devicesOf(panel, phase);
+
+    const col = document.createElement('div');
+    col.className = `drop-zone rounded-xl border ${pc.border} bg-slate-900/40 p-2 min-h-[80px]`;
+    col.dataset.panel = panel.key ?? '';
+    col.dataset.phase = phase;
+    col.ondragover = onDropZoneDragOver;
+    col.ondragleave = onDropZoneDragLeave;
+    col.ondrop = onDropZoneDrop;
+
+    const label = document.createElement('div');
+    label.className = `text-xs font-bold ${pc.text} mb-1`;
+    label.textContent = phase + ' (' + colDevs.length + ')';
+    col.appendChild(label);
+
+    const list = document.createElement('div');
+    list.className = 'flex flex-wrap gap-1.5 min-h-[32px]';
+    colDevs.forEach(dev => list.appendChild(makeCard(dev)));
+    col.appendChild(list);
+    return col;
+  }
+
   function makeCard(dev) {
-    const loc = locationInfo(dev);
     const hasTelemetry = dev.type === 'smart_breaker_sy2';
 
     const el = document.createElement('div');
@@ -140,27 +206,10 @@
     }
 
     const name = document.createElement('span');
-    name.className = 'truncate max-w-[160px] font-medium';
+    name.className = 'truncate max-w-[150px] font-medium';
     name.title = dev.name + ' (' + dev.id + ')';
     name.textContent = dev.name;
     el.appendChild(name);
-
-    const locBtn = document.createElement('button');
-    locBtn.className = 'px-1 rounded text-xs leading-none';
-    locBtn.textContent = loc.badge;
-    locBtn.title = loc.title + ' — клик, чтобы сменить щиток';
-    locBtn.onclick = (e) => {
-      e.stopPropagation();
-      const i = LOCATIONS.findIndex(l => l.key === (dev.location || null));
-      const next = LOCATIONS[(i + 1) % LOCATIONS.length];
-      if (next.key) dev.location = next.key; else delete dev.location;
-      dev.din_rail = next.rail;
-      if (next.key === 'parking_subpanel') dev.fed_by = dev.fed_by || 'L1-08';
-      else delete dev.fed_by;
-      markDirty();
-      render();
-    };
-    el.appendChild(locBtn);
 
     el.addEventListener('dragstart', e => {
       e.dataTransfer.setData('text/plain', dev.id);
@@ -170,7 +219,7 @@
     return el;
   }
 
-  function onLaneDragOver(e) {
+  function onDropZoneDragOver(e) {
     e.preventDefault();
     e.currentTarget.classList.add('dragover');
     const list = e.currentTarget.querySelector('.flex');
@@ -185,26 +234,39 @@
     else list.appendChild(dragging);
   }
 
-  function onLaneDragLeave(e) {
+  function onDropZoneDragLeave(e) {
     if (e.currentTarget === e.target) e.currentTarget.classList.remove('dragover');
   }
 
-  function onLaneDrop(e) {
+  function onDropZoneDrop(e) {
     e.preventDefault();
-    const lane = e.currentTarget;
-    lane.classList.remove('dragover');
+    const zone = e.currentTarget;
+    zone.classList.remove('dragover');
     const id = e.dataTransfer.getData('text/plain');
     const dev = devices.find(d => d.id === id);
     if (!dev) return;
 
-    const laneKey = lane.dataset.lane;
-    dev.phase = laneKey;
+    const panelKey = zone.dataset.panel || null;
+    const phase = zone.dataset.phase || null;
+    const panel = PANELS.find(p => p.key === panelKey) || PANELS[1];
 
-    const list = lane.querySelector('.flex');
-    [...list.querySelectorAll('.card')].forEach((card, idx) => {
-      const d = devices.find(x => x.id === card.dataset.id);
-      if (d) d.din_position = idx + 1;
-    });
+    if (panelKey) dev.location = panelKey; else delete dev.location;
+    dev.din_rail = panel.rail;
+    if (panelKey === 'parking_subpanel') dev.fed_by = dev.fed_by || 'L1-08';
+    else delete dev.fed_by;
+    dev.phase = phase || '3P';
+
+    if (zone.dataset.general === '1') {
+      // Общий ввод не переупорядочивается перетаскиванием — порядок всегда
+      // фиксирован физикой проводки (см. GENERAL_RANK), только положение в нём.
+      dev.din_position = GENERAL_RANK[dev.id] ?? 99;
+    } else {
+      const list = zone.querySelector('.flex');
+      [...list.querySelectorAll('.card')].forEach((card, idx) => {
+        const d = devices.find(x => x.id === card.dataset.id);
+        if (d) d.din_position = idx + 1;
+      });
+    }
 
     markDirty();
     render();
