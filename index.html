@@ -59,23 +59,25 @@
         </div>
       </div>
 
-      <!-- Переключатель режима симуляции перебалансировки -->
       <div class="flex items-center gap-3">
-        <div class="bg-slate-800 p-1 rounded-xl border border-slate-700 flex items-center">
-          <button id="btn-mode-actual" onclick="setMode('actual')" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition bg-rose-600 text-white shadow">
-            Текущее состояние
-          </button>
-          <button id="btn-mode-rebalanced" onclick="setMode('rebalanced')" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition text-slate-400 hover:text-white">
-            <i class="fa-solid fa-wand-magic-sparkles mr-1"></i>После перебалансировки
-          </button>
-        </div>
-
         <a href="topology.html" title="Редактор топологии щита" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
           <i class="fa-solid fa-diagram-project text-sm"></i>
         </a>
         <button onclick="refreshData()" title="Синхронизировать с Tuya Cloud" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
           <i class="fa-solid fa-rotate text-sm" id="refresh-icon"></i>
         </button>
+        <div class="flex items-center gap-1.5">
+          <button id="btn-live" onclick="toggleLive()" title="Автообновление каждые 10 сек (автостоп через 5 мин)"
+            class="px-2.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition text-xs font-bold flex items-center gap-1.5">
+            <span id="live-dot" class="w-2 h-2 rounded-full bg-slate-600"></span>LIVE
+          </button>
+          <select id="live-interval" onchange="onLiveIntervalChange()" title="Интервал автообновления"
+            class="bg-slate-800 border border-slate-700 text-slate-300 text-xs rounded-lg px-1.5 py-2">
+            <option value="5000">5с</option>
+            <option value="10000" selected>10с</option>
+            <option value="30000">30с</option>
+          </select>
+        </div>
         <span id="refresh-status" class="text-xs text-slate-500"></span>
       </div>
     </div>
@@ -104,11 +106,6 @@
             Из-за мощной нагрузки 3.1 кВт на Фазе 1 при почти нулевой нагрузке на Фазе 3 нулевая точка смещается в сторону L1.
             Это вызывает просадку L1 (до 202.1В) и опасный скачок L3 (до 242.1В), угрожая чувствительной технике.
           </p>
-        </div>
-        <div class="flex flex-wrap gap-2 shrink-0">
-          <button onclick="document.getElementById('rebalance-section').scrollIntoView({behavior: 'smooth'})" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl shadow-lg transition flex items-center gap-2">
-            <i class="fa-solid fa-screwdriver-wrench"></i> План перекоммутации
-          </button>
         </div>
       </div>
     </div>
@@ -270,15 +267,18 @@
     <!-- Физический вид электрощита (DIN-рейки) -->
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-6">
       <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 class="text-lg font-bold text-white flex items-center gap-2">
-            <i class="fa-solid fa-server text-amber-400"></i> Схема распределительного щита (DIN-рейки)
-          </h2>
-          <p class="text-xs text-slate-400"><span id="grid-device-count">33</span> модульных устройства • Кликните на автомат для детального анализа линии</p>
-        </div>
+        <button onclick="toggleDinSection()" class="flex items-center gap-2 text-left group">
+          <i id="din-collapse-icon" class="fa-solid fa-chevron-down text-slate-500 group-hover:text-slate-300 transition-transform"></i>
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-server text-amber-400"></i> Схема распределительного щита (DIN-рейки)
+            </h2>
+            <p class="text-xs text-slate-400"><span id="grid-device-count">33</span> модульных устройства • клик по автомату — детали линии, клик по заголовку — свернуть/развернуть. Переставить автоматы — <a href="topology.html" class="text-indigo-400 hover:underline" onclick="event.stopPropagation()">редактор топологии</a></p>
+          </div>
+        </button>
 
         <!-- Фильтры -->
-        <div class="flex flex-wrap gap-2 text-xs">
+        <div id="din-filters" class="flex flex-wrap gap-2 text-xs">
           <button onclick="filterDevices('all')" id="flt-all" class="px-3 py-1 rounded-lg bg-indigo-600 text-white font-medium">Все (<span id="flt-all-count">33</span>)</button>
           <button onclick="filterDevices('L1')" id="flt-l1" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-rose-300 border border-rose-500/30">Фаза 1 (<span id="flt-l1-count">8</span>)</button>
           <button onclick="filterDevices('L2')" id="flt-l2" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/30">Фаза 2 (<span id="flt-l2-count">19</span>)</button>
@@ -303,63 +303,6 @@
       </div>
       <div id="topology-container" class="overflow-x-auto">
         <!-- Генерируется через JS -->
-      </div>
-    </div>
-
-    <!-- Рекомендации по перебалансировке нагрузки -->
-    <div id="rebalance-section" class="bg-gradient-to-br from-slate-900 to-indigo-950/40 border border-indigo-500/30 rounded-2xl p-6 shadow-2xl space-y-5">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-lg shadow-lg shadow-indigo-600/30">
-          <i class="fa-solid fa-diagram-project"></i>
-        </div>
-        <div>
-          <h3 class="text-base sm:text-lg font-bold text-white">Инженерный план балансировки распределительного щита</h3>
-          <p class="text-xs text-slate-400">Выравнивание токов между фазами (L1/L2 ≈ 16А при почти нулевом L3)</p>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-800 space-y-2">
-          <div class="text-xs font-bold text-rose-400 flex items-center gap-2">
-            <span class="w-6 h-6 rounded-full bg-rose-500/20 flex items-center justify-center">1</span>
-            Перенос «2 бойлер холод очистка скважина» на Фазу 3
-          </div>
-          <p class="text-xs text-slate-300">
-            Переключить кабель питания линии «2 бойлер холод очистка скважина» (7.98 А / 1.5 кВт) с фазной шины L2 на L3.
-          </p>
-          <div class="text-[11px] text-emerald-400 font-mono bg-slate-950 p-2 rounded">
-            L2 разгрузится: 15.55А → 7.57А<br>
-            L3 нагрузится: 0.61А → 8.59А<br>
-            Оценка разброса напряжений: 43.7В → ~12.4В (не идеал — L1 с котлом не трогаем)
-          </div>
-        </div>
-
-        <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-800 space-y-2">
-          <div class="text-xs font-bold text-amber-400 flex items-center gap-2">
-            <span class="w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center">2</span>
-            РКН L1 и РКН L2 — у порога отключения
-          </div>
-          <p class="text-xs text-slate-300">
-            Обе фазы сейчас в 0.1–0.7В от уставки Umin=195В. Любое доп. включение может вызвать ложное отключение.
-          </p>
-          <div class="text-[11px] text-emerald-400 font-mono bg-slate-950 p-2 rounded">
-            После переноса линии выше — запас у L2 вырастет (~207В).<br>
-            L1 (16.04А, котёл) остаётся без запаса — переразводка проводки котла, не часть этого плана.
-          </div>
-        </div>
-
-        <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-800 space-y-2">
-          <div class="text-xs font-bold text-violet-400 flex items-center gap-2">
-            <span class="w-6 h-6 rounded-full bg-violet-500/20 flex items-center justify-center">3</span>
-            Ревизия автомата «Скважина» (44°C)
-          </div>
-          <p class="text-xs text-slate-300">
-            Затянуть винтовые клеммы автомата «Скважина» (Фаза 1, L1-08) динамометрической отверткой (2.5 Н·м).
-          </p>
-          <div class="text-[11px] text-amber-300 font-mono bg-slate-950 p-2 rounded">
-            При токе 0.096А нагрев до 44°C указывает на переходное сопротивление в контактах!
-          </div>
-        </div>
       </div>
     </div>
 
@@ -432,7 +375,6 @@
     // Исходные данные схемы (33 устройства)
     let rawData = null;
     let currentFilter = 'all';
-    let currentMode = 'actual'; // 'actual' | 'rebalanced'
     let powerChartInstance = null;
     let voltageChartInstance = null;
 
@@ -456,19 +398,6 @@
       renderDashboard();
     }
 
-    function setMode(mode) {
-      currentMode = mode;
-      document.getElementById('btn-mode-actual').className = mode === 'actual' 
-        ? 'px-3 py-1.5 rounded-lg text-xs font-semibold transition bg-rose-600 text-white shadow'
-        : 'px-3 py-1.5 rounded-lg text-xs font-semibold transition text-slate-400 hover:text-white';
-      
-      document.getElementById('btn-mode-rebalanced').className = mode === 'rebalanced'
-        ? 'px-3 py-1.5 rounded-lg text-xs font-semibold transition bg-emerald-600 text-white shadow'
-        : 'px-3 py-1.5 rounded-lg text-xs font-semibold transition text-slate-400 hover:text-white';
-
-      renderDashboard();
-    }
-
     function renderDashboard() {
       if (!rawData) return;
 
@@ -481,13 +410,9 @@
         versionEl.textContent = [ver, upd].filter(Boolean).join(' • ');
       }
 
-      const isRebalanced = (currentMode === 'rebalanced');
       const alertBox = document.getElementById('imbalance-alert-box');
       const headerBadge = document.getElementById('header-badge');
-      const spreadFor = level => level >= 15 ? 'HIGH' : (level >= 8 ? 'MEDIUM' : 'LOW');
-      const riskLevel = isRebalanced
-        ? spreadFor(rawData.rebalanced_plan.asymmetry.phase_voltage_spread_v)
-        : (rawData.asymmetry_analysis.risk_level || 'HIGH');
+      const riskLevel = rawData.asymmetry_analysis.risk_level || 'HIGH';
       if (riskLevel === 'LOW') {
         headerBadge.className = 'text-xs font-mono font-normal px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
         headerBadge.innerHTML = '<i class="fa-solid fa-check mr-1"></i>ФАЗЫ СБАЛАНСИРОВАНЫ';
@@ -499,37 +424,10 @@
         headerBadge.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-1"></i>ДИСБАЛАНС НАГРУЗКИ';
       }
 
-      if (isRebalanced) {
-        const rb = rawData.rebalanced_plan;
-        const spread = rb.asymmetry.phase_voltage_spread_v.toFixed(1);
-        const rm = rb.phase_metrics;
-        const uLine = PHASES.map(ph => `${ph}: ${rm[ph].voltage_avg_v.toFixed(1)}В`).join(', ');
-        const stillImbalanced = riskLevel !== 'LOW';
-        alertBox.className = "bg-gradient-to-r from-emerald-950/70 via-slate-900 to-teal-950/70 border border-emerald-600/40 rounded-2xl p-5 shadow-2xl relative overflow-hidden";
-        alertBox.innerHTML = `
-          <div class="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div class="space-y-1">
-              <div class="flex items-center gap-2">
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-600 text-white">
-                  СИМУЛЯЦИЯ: ${stillImbalanced ? 'ЧАСТИЧНАЯ БАЛАНСИРОВКА' : 'БАЛАНСИРОВКА ВЫПОЛНЕНА'}
-                </span>
-                <span class="text-xs text-slate-400 font-mono">ΔU = ${spread} В (было ${rawData.asymmetry_analysis.phase_voltage_spread_v.toFixed(1)} В)</span>
-              </div>
-              <h2 class="text-base sm:text-lg font-bold text-white">${rb.description}</h2>
-              <p class="text-xs text-slate-300 max-w-3xl">
-                Напряжение по фазам после переноса: ${uLine}.
-                ${stillImbalanced ? 'Перекос снижен, но не устранён — L1 несёт единственную крупную нагрузку (котёл), её можно перенести только переразводкой проводки.' : 'Разброс сведён к минимуму.'}
-              </p>
-            </div>
-            <button onclick="setMode('actual')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg transition">
-              Вернуть текущие замеры
-            </button>
-          </div>
-        `;
-      } else {
+      {
         const m = rawData.phase_metrics;
         const spread = rawData.asymmetry_analysis.phase_voltage_spread_v.toFixed(1);
-        const riskLevel = rawData.asymmetry_analysis.risk_level || (spread >= 15 ? 'HIGH' : spread >= 8 ? 'MEDIUM' : 'LOW');
+        const recommendation = rawData.asymmetry_analysis.recommendation || '';
         const [maxPh, minPh] = [['L1', 'L2', 'L3'].reduce((a, b) => m[a].total_current_a >= m[b].total_current_a ? a : b),
                                  ['L1', 'L2', 'L3'].reduce((a, b) => m[a].total_current_a <= m[b].total_current_a ? a : b)];
 
@@ -547,6 +445,7 @@
                 <h2 class="text-base sm:text-lg font-bold text-white">
                   Нагрузка распределена ровно: макс. ${m[maxPh].phase_name} (${m[maxPh].total_current_a.toFixed(2)}A), мин. ${m[minPh].phase_name} (${m[minPh].total_current_a.toFixed(2)}A)
                 </h2>
+                ${recommendation ? `<p class="text-xs text-slate-300 max-w-3xl">${recommendation}</p>` : ''}
               </div>
             </div>
           `;
@@ -566,26 +465,20 @@
                 <h2 class="text-base sm:text-lg font-bold text-white">
                   ${m[maxPh].phase_name} перегружена (${m[maxPh].total_current_a.toFixed(2)}A / ${m[maxPh].voltage_avg_v.toFixed(1)}В), а ${m[minPh].phase_name} недогружена (${m[minPh].total_current_a.toFixed(2)}A / ${m[minPh].voltage_avg_v.toFixed(1)}В)
                 </h2>
-                <p class="text-xs text-slate-300 max-w-3xl">
-                  Разброс токов между фазами смещает потенциал нейтрали — просадка на перегруженной фазе, завышение на недогруженной.
-                </p>
+                ${recommendation ? `<p class="text-xs text-slate-300 max-w-3xl">${recommendation}</p>` : ''}
               </div>
-              <button onclick="document.getElementById('rebalance-section').scrollIntoView({behavior: 'smooth'})" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl shadow-lg transition flex items-center gap-2">
-                <i class="fa-solid fa-screwdriver-wrench"></i> План перекоммутации
-              </button>
             </div>
           `;
         }
       }
 
       // Карточки фаз — числа берутся из rawData, а не захардкожены
-      const metricsSource = isRebalanced ? rawData.rebalanced_plan.phase_metrics : rawData.phase_metrics;
-      PHASES.forEach(ph => applyPhaseCard(ph, metricsSource[ph], isRebalanced));
+      PHASES.forEach(ph => applyPhaseCard(ph, rawData.phase_metrics[ph]));
 
       updateDeviceCounts();
       renderDevices();
       renderTopology();
-      renderCharts(isRebalanced);
+      renderCharts();
     }
 
     const PHASES = ['L1', 'L2', 'L3'];
@@ -593,7 +486,7 @@
     // отдельного автомата линии. Отдельного физического QF1 на этом щите нет.
     const phaseDenom = () => rawData?.grid_specifications?.input_circuit_breaker_rating_a || 30;
 
-    function applyPhaseCard(phase, m, isRebalanced) {
+    function applyPhaseCard(phase, m) {
       const p = phase.toLowerCase();
       const u = m.voltage_avg_v.toFixed(1);
       const i = m.total_current_a.toFixed(2);
@@ -618,10 +511,6 @@
         if (maxEl && m.voltage_max_v != null) maxEl.innerText = `макс. ${m.voltage_max_v.toFixed(1)} В${m.voltage_max_v >= 240 ? '!' : ''}`;
       }
 
-      if (phase === 'L1') {
-        document.getElementById('bar-fill-l1').className = 'h-full rounded-full transition-all duration-700 '
-          + (isRebalanced ? 'bg-emerald-500' : 'bg-rose-500');
-      }
 
       // Бейдж статуса ("НОРМА"/"НЕДОГРУЖЕНА"/...) раньше был зашит в HTML и никогда не
       // обновлялся — показывал "ПЕРЕГРУЗ"/"ЗАВЫШЕНО" даже при 0А. Считаем по тем же
@@ -670,6 +559,22 @@
       });
       renderDevices();
     }
+
+    const DIN_COLLAPSE_KEY = 'din-section-collapsed';
+
+    function toggleDinSection() {
+      setDinCollapsed(document.getElementById('devices-container').style.display !== 'none');
+    }
+
+    function setDinCollapsed(collapsed) {
+      document.getElementById('devices-container').style.display = collapsed ? 'none' : '';
+      document.getElementById('din-filters').style.display = collapsed ? 'none' : '';
+      document.getElementById('din-collapse-icon').style.transform = collapsed ? 'rotate(-90deg)' : '';
+      localStorage.setItem(DIN_COLLAPSE_KEY, collapsed ? '1' : '0');
+    }
+
+    // Свернуто/развёрнуто — по последнему выбору пользователя (переживает перезагрузку страницы).
+    setDinCollapsed(localStorage.getItem(DIN_COLLAPSE_KEY) === '1');
 
     const PHASE_STYLE = {
       L1: { text: 'text-rose-300', border: 'border-rose-500/40', bg: 'bg-rose-500/10', dot: 'bg-rose-500' },
@@ -908,8 +813,8 @@
       });
     }
 
-    function renderCharts(isRebalanced) {
-      const m = isRebalanced ? rawData.rebalanced_plan.phase_metrics : rawData.phase_metrics;
+    function renderCharts() {
+      const m = rawData.phase_metrics;
       const p1 = m.L1.total_power_w, p2 = m.L2.total_power_w, p3 = m.L3.total_power_w;
 
       // Donut Chart: Мощность по фазам
@@ -991,7 +896,14 @@
       document.getElementById('device-modal').classList.add('hidden');
     }
 
+    let isRefreshing = false;
+
     async function refreshData() {
+      // Защита от наложения вызовов: в LIVE-режиме следующий тик может наступить
+      // раньше, чем вернулся предыдущий запрос к Tuya Cloud (19 устройств опрашиваются
+      // последовательно и это не мгновенно) — пропускаем тик, а не копим очередь.
+      if (isRefreshing) return;
+      isRefreshing = true;
       const icon = document.getElementById('refresh-icon');
       const status = document.getElementById('refresh-status');
       icon.classList.add('fa-spin');
@@ -1003,12 +915,60 @@
           throw new Error(result.error || `HTTP ${resp.status}`);
         }
         await loadData();
-        status.textContent = 'обновлено ' + new Date().toLocaleTimeString('ru-RU');
+        status.textContent = (liveActive ? '🔴 LIVE • ' : '') + 'обновлено ' + new Date().toLocaleTimeString('ru-RU');
       } catch (e) {
         console.error('Ошибка синхронизации с Tuya Cloud:', e);
         status.textContent = 'ошибка синка: ' + e.message;
       } finally {
         icon.classList.remove('fa-spin');
+        isRefreshing = false;
+      }
+    }
+
+    // LIVE-режим: периодический авто-опрос Tuya Cloud, чтобы видеть изменение нагрузки
+    // на линии в реальном времени (например, включили чайник). Опрос всё равно идёт
+    // через Tuya Cloud API (не мгновенная локальная телеметрия) — каждый тик это полный
+    // цикл авторизации + опроса 19 автоматов, поэтому интервал не делаем короче 5 сек
+    // и автоматически выключаем через 5 минут, чтобы случайно не оставить крутиться
+    // и не упереться в лимиты Tuya API.
+    let liveActive = false;
+    let liveTimer = null;
+    let liveStopTimeout = null;
+    const LIVE_AUTO_STOP_MS = 5 * 60 * 1000;
+
+    function toggleLive() {
+      if (liveActive) stopLive('выключено');
+      else startLive();
+    }
+
+    function startLive() {
+      const ms = parseInt(document.getElementById('live-interval').value, 10);
+      liveActive = true;
+      document.getElementById('btn-live').classList.add('bg-rose-600/30', 'border-rose-500/50', 'text-rose-300');
+      document.getElementById('live-dot').className = 'w-2 h-2 rounded-full bg-rose-500 alert-pulse';
+      refreshData();
+      liveTimer = setInterval(refreshData, ms);
+      liveStopTimeout = setTimeout(() => stopLive('автостоп через 5 мин'), LIVE_AUTO_STOP_MS);
+    }
+
+    function stopLive(reason) {
+      clearInterval(liveTimer);
+      clearTimeout(liveStopTimeout);
+      liveActive = false;
+      liveTimer = null;
+      liveStopTimeout = null;
+      document.getElementById('btn-live').classList.remove('bg-rose-600/30', 'border-rose-500/50', 'text-rose-300');
+      document.getElementById('live-dot').className = 'w-2 h-2 rounded-full bg-slate-600';
+      const status = document.getElementById('refresh-status');
+      if (reason) status.textContent = 'LIVE ' + reason;
+    }
+
+    function onLiveIntervalChange() {
+      // Поменяли интервал на лету — перезапускаем таймер (но не автостоп-таймаут) с новым значением.
+      if (liveTimer) {
+        clearInterval(liveTimer);
+        const ms = parseInt(document.getElementById('live-interval').value, 10);
+        liveTimer = setInterval(refreshData, ms);
       }
     }
 
@@ -1019,10 +979,6 @@
       return {
         phase_metrics: { L1: { ...zeroPhase }, L2: { ...zeroPhase }, L3: { ...zeroPhase } },
         asymmetry_analysis: { phase_voltage_spread_v: 0 },
-        rebalanced_plan: {
-          phase_metrics: { L1: { ...zeroPhase }, L2: { ...zeroPhase }, L3: { ...zeroPhase } },
-          asymmetry: { phase_voltage_spread_v: 0 }
-        },
         devices: []
       };
     }
