@@ -48,10 +48,15 @@
   // плюс отдельная строка сверху для узлов без конкретной фазы (3P: вводные автоматы,
   // АВР, генератор, QF1, QD1).
   const PANELS = [
-    { key: 'street_panel_pre_ats', title: 'Щиток 1 — за домом (ДО АВР, не резервируется генератором)', accent: 'sky', rail: 0 },
-    { key: null, title: 'Щиток 2 — в доме (после QF1/QD1)', accent: 'indigo', rail: 2 },
-    { key: 'parking_subpanel', title: 'Щиток 3 — на парковке (питается от «Парковка», L1-08)', accent: 'amber', rail: 6 },
+    { key: 'street_panel_pre_ats', title: 'Щиток 1 — за домом (ДО АВР, не резервируется генератором, а ГАЗ на ИБП)', accent: 'sky', rail: 0 },
+    { key: null, title: 'Щиток 2 — в доме (после ввода)', accent: 'indigo', rail: 2 },
+    { key: 'parking_subpanel', title: 'Щиток 3 — на парковке (питается от «Парковка», это всё линия L2)', accent: 'amber', rail: 6 },
   ];
+
+  // Эти узлы в топологии владельца физически не существуют как отдельные автоматы —
+  // реле контроля напряжения встроено прямо в умные автоматы Tuya, а не вынесено
+  // отдельным устройством; отдельного QF1 тоже нет. Не показываем их в редакторе.
+  const HIDDEN_IDS = new Set(['DEV-MAIN-01', 'DEV-VRELAY-L1', 'DEV-VRELAY-L2', 'DEV-VRELAY-L3']);
   const PHASES = ['L1', 'L2', 'L3'];
 
   const ACCENT = {
@@ -67,9 +72,19 @@
 
   // Фиксированный физический порядок узлов "Общий ввод" — он не редактируется перетаскиванием
   // (это реальная проводка, она всегда одна и та же), только отображается стрелочками.
+  // Короткие узнаваемые подписи для инфраструктурных узлов — их полные официальные
+  // имена длинные и в узкой карточке обрезались до нечитаемого "Реле контроля напряже...".
+  // Полное имя всегда доступно по наведению (title).
+  const SHORT_NAME = {
+    'DEV-RCD-01': 'УЗО 300 мА',
+  };
+
   const GENERAL_RANK = {
     'STREET-IN1': 1, 'STREET-ATS': 2, 'STREET-GEN': 3, 'STREET-IN2': 4,
-    'DEV-MAIN-01': 5, 'DEV-RCD-01': 6,
+    'DEV-MAIN-01': 5,
+    // DEV-RCD-01 (QD1/УЗО) — по просьбе владельца идёт ПОСЛЕ остальных узлов строки
+    // (99 — запасной ранг для узлов без явной записи здесь), а не сразу за QF1.
+    'DEV-RCD-01': 100,
   };
 
   let devices = [];
@@ -81,7 +96,7 @@
       const resp = await fetch(SCHEMA_URL, { cache: 'no-store' });
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       const data = await resp.json();
-      devices = data.devices || [];
+      devices = (data.devices || []).filter(d => !HIDDEN_IDS.has(d.id));
       status.textContent = 'Загружено ' + devices.length + ' узлов (данные от ' + (data.updated_at || '?') + ')';
       render();
     } catch (e) {
@@ -109,9 +124,12 @@
   function renderPanelConnector(fromPanel, toPanel) {
     const el = document.createElement('div');
     el.className = 'flex items-center justify-center gap-2 text-xs text-slate-500';
-    const label = toPanel.key === 'parking_subpanel'
-      ? 'питание ↓ через фидер «Парковка» (L1-08)'
-      : 'питание ↓';
+    let label = 'питание ↓';
+    if (toPanel.key === 'parking_subpanel') {
+      // Фаза фидера живая, а не зашитая в текст — "Парковка" меняла фазу уже не раз.
+      const feeder = devices.find(d => d.id === 'L1-08');
+      label = 'питание ↓ через фидер «Парковка»' + (feeder ? ` (сейчас ${feeder.phase})` : '');
+    }
     el.innerHTML = `<span class="text-slate-600">┊</span><span>${label}</span><span class="text-slate-600">┊</span>`;
     return el;
   }
@@ -206,9 +224,9 @@
     }
 
     const name = document.createElement('span');
-    name.className = 'truncate max-w-[150px] font-medium';
-    name.title = dev.name + ' (' + dev.id + ')';
-    name.textContent = dev.name;
+    name.className = 'truncate max-w-[180px] font-medium';
+    name.title = dev.name + ' (' + dev.id + ')' + (dev.notes ? '\n\n' + dev.notes : '');
+    name.textContent = SHORT_NAME[dev.id] || dev.name;
     el.appendChild(name);
 
     el.addEventListener('dragstart', e => {
