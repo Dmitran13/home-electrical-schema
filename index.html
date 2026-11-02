@@ -121,12 +121,12 @@
         <div class="flex justify-between items-start mb-4">
           <div>
             <div class="flex items-center gap-2">
-              <span class="w-3 h-3 rounded-full bg-rose-500 alert-pulse"></span>
+              <span id="dot-l1" class="w-3 h-3 rounded-full bg-rose-500 alert-pulse"></span>
               <h3 class="font-bold text-base text-rose-400">ФАЗА 1 (L1)</h3>
             </div>
-            <p class="text-xs text-slate-400">Котёл, скважина, насос, гардероб</p>
+            <p id="lines-desc-l1" class="text-xs text-slate-400">—</p>
           </div>
-          <span class="text-xs font-bold px-2 py-1 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">ПЕРЕГРУЗ</span>
+          <span id="badge-l1" class="text-xs font-bold px-2 py-1 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">—</span>
         </div>
 
         <div class="grid grid-cols-3 gap-2 text-center py-3 bg-slate-950/60 rounded-xl border border-slate-800 mb-4">
@@ -163,12 +163,12 @@
         <div class="flex justify-between items-start mb-4">
           <div>
             <div class="flex items-center gap-2">
-              <span class="w-3 h-3 rounded-full bg-emerald-400"></span>
+              <span id="dot-l2" class="w-3 h-3 rounded-full bg-emerald-400"></span>
               <h3 class="font-bold text-base text-emerald-400">ФАЗА 2 (L2)</h3>
             </div>
-            <p class="text-xs text-slate-400">Бойлер, свет, спальни</p>
+            <p id="lines-desc-l2" class="text-xs text-slate-400">—</p>
           </div>
-          <span class="text-xs font-bold px-2 py-1 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">НОРМА</span>
+          <span id="badge-l2" class="text-xs font-bold px-2 py-1 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">—</span>
         </div>
 
         <div class="grid grid-cols-3 gap-2 text-center py-3 bg-slate-950/60 rounded-xl border border-slate-800 mb-4">
@@ -205,12 +205,12 @@
         <div class="flex justify-between items-start mb-4">
           <div>
             <div class="flex items-center gap-2">
-              <span class="w-3 h-3 rounded-full bg-violet-400 alert-pulse"></span>
+              <span id="dot-l3" class="w-3 h-3 rounded-full bg-violet-400 alert-pulse"></span>
               <h3 class="font-bold text-base text-violet-400">ФАЗА 3 (L3)</h3>
             </div>
-            <p class="text-xs text-slate-400">Плита, духовка, кухня, розетки В</p>
+            <p id="lines-desc-l3" class="text-xs text-slate-400">—</p>
           </div>
-          <span class="text-xs font-bold px-2 py-1 rounded bg-violet-500/20 text-violet-300 border border-violet-500/30">ЗАВЫШЕНО</span>
+          <span id="badge-l3" class="text-xs font-bold px-2 py-1 rounded bg-violet-500/20 text-violet-300 border border-violet-500/30">—</span>
         </div>
 
         <div class="grid grid-cols-3 gap-2 text-center py-3 bg-slate-950/60 rounded-xl border border-slate-800 mb-4">
@@ -589,9 +589,9 @@
     }
 
     const PHASES = ['L1', 'L2', 'L3'];
-    // Знаменатель загрузки шкалы — номинал вводного автомата (QF1) из данных:
-    // физический предел фазной шины, а не уставка отдельного автомата линии.
-    const phaseDenom = () => rawData?.grid_specifications?.input_circuit_breaker_rating_a || 25;
+    // Знаменатель загрузки шкалы — реальный предел фазной шины (30А), а не уставка
+    // отдельного автомата линии. Отдельного физического QF1 на этом щите нет.
+    const phaseDenom = () => rawData?.grid_specifications?.input_circuit_breaker_rating_a || 30;
 
     function applyPhaseCard(phase, m, isRebalanced) {
       const p = phase.toLowerCase();
@@ -621,6 +621,39 @@
       if (phase === 'L1') {
         document.getElementById('bar-fill-l1').className = 'h-full rounded-full transition-all duration-700 '
           + (isRebalanced ? 'bg-emerald-500' : 'bg-rose-500');
+      }
+
+      // Бейдж статуса ("НОРМА"/"НЕДОГРУЖЕНА"/...) раньше был зашит в HTML и никогда не
+      // обновлялся — показывал "ПЕРЕГРУЗ"/"ЗАВЫШЕНО" даже при 0А. Считаем по тем же
+      // правилам, что и бэкенд (sync_summary_into_schema в tuya_monitor.py).
+      let status = m.status;
+      if (!status) {
+        if (m.total_current_a <= 1.0) status = 'UNDERLOAD';
+        else if (m.voltage_avg_v && (m.voltage_avg_v < VOLTAGE_LOW_WARNING || m.voltage_avg_v > VOLTAGE_HIGH_WARNING)) status = 'VOLTAGE_WARNING';
+        else status = 'NORMAL';
+      }
+      const STATUS_BADGE = {
+        NORMAL: { label: 'НОРМА', cls: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' },
+        UNDERLOAD: { label: 'НЕДОГРУЖЕНА', cls: 'bg-slate-600/30 text-slate-300 border border-slate-600/40' },
+        VOLTAGE_WARNING: { label: 'НАПРЯЖЕНИЕ ВНЕ НОРМЫ', cls: 'bg-rose-500/20 text-rose-300 border border-rose-500/30' },
+      };
+      const info = STATUS_BADGE[status] || STATUS_BADGE.NORMAL;
+      const badgeEl = document.getElementById(`badge-${p}`);
+      if (badgeEl) {
+        badgeEl.textContent = info.label;
+        badgeEl.className = 'text-xs font-bold px-2 py-1 rounded ' + info.cls;
+      }
+
+      // Список линий фазы — тоже раньше был зашит текстом и не совпадал с реальным
+      // составом после переноса линий владельцем.
+      const descEl = document.getElementById(`lines-desc-${p}`);
+      if (descEl && rawData.devices) {
+        const names = rawData.devices
+          .filter(d => d.phase === phase && d.type === 'smart_breaker_sy2')
+          .map(d => d.name);
+        descEl.textContent = names.length
+          ? (names.length > 4 ? names.slice(0, 4).join(', ') + ` и ещё ${names.length - 4}` : names.join(', '))
+          : 'нет линий';
       }
     }
 
