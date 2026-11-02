@@ -11,13 +11,27 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 echo "=== Копируем статику и бэкенд кнопки 'Обновить' ==="
 ssh "$SERVER" "mkdir -p '$DEPLOY_DIR'"
-rsync -az "$PROJECT_DIR/index.html" "$PROJECT_DIR/electrical_schema.svg" \
+
+# Штампуем index.html меткой деплоя (git-коммит + время), чтобы на странице было видно,
+# прошёл ли деплой, а не только свежесть данных телеметрии. Подставляем во временную копию —
+# в репозитории index.html остаётся с плейсхолдером __DEPLOY_BUILD__.
+BUILD_STAMP="$(git -C "$PROJECT_DIR" rev-parse --short HEAD 2>/dev/null || echo 'unknown')-$(date -u +%Y%m%dT%H%M%SZ)"
+TMP_INDEX="$(mktemp)"
+sed "s/__DEPLOY_BUILD__/$BUILD_STAMP/" "$PROJECT_DIR/index.html" > "$TMP_INDEX"
+
+# scp вместо rsync — в Git Bash/MSYS2 на Windows rsync штатно не ставится,
+# а WSL здесь не установлен. Для этого небольшого набора файлов разница
+# с rsync (delta-sync) не ощущается — каждый деплой просто перезаливает их целиком.
+scp "$TMP_INDEX" "$SERVER:$DEPLOY_DIR/index.html"
+rm -f "$TMP_INDEX"
+scp "$PROJECT_DIR/electrical_schema.svg" \
   "$PROJECT_DIR/refresh_server.py" "$PROJECT_DIR/tuya_monitor.py" "$SERVER:$DEPLOY_DIR/"
+echo "  Метка деплоя: $BUILD_STAMP"
 
 # schema_data.json на сервере — живой файл, его пишет кнопка "Обновить" через Tuya Cloud.
 # Кладём из git только при первом деплое, иначе каждый деплой затирал бы live-данные старым снимком.
 ssh "$SERVER" "[ -f '$DEPLOY_DIR/schema_data.json' ] || echo NEED_SEED" | grep -q NEED_SEED \
-  && rsync -az "$PROJECT_DIR/schema_data.json" "$SERVER:$DEPLOY_DIR/" \
+  && scp "$PROJECT_DIR/schema_data.json" "$SERVER:$DEPLOY_DIR/" \
   && echo "  schema_data.json отсутствовал на сервере — залили стартовый снимок из git" \
   || echo "  schema_data.json на сервере уже live — не трогаем"
 
