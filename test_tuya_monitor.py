@@ -69,7 +69,8 @@ def test_build_state_snapshot():
     assert isinstance(snap["alert_keys"], list)
 
 
-def test_build_change_message_detects_breaker_toggle():
+def test_build_change_message_ignores_breaker_toggle():
+    """Штатное переключение автомата ON/OFF не должно генерировать сообщение в Telegram."""
     schema = {"devices": [{"id": "L1-01", "name": "Котёл", "phase": "L1", "state": "ON",
                             "category": "heating", "rated_current_a": 16, "current_a": 0.0,
                             "power_w": 0.0, "temperature_c": 30, "voltage_v": 210.0}]}
@@ -77,9 +78,20 @@ def test_build_change_message_detects_breaker_toggle():
     old_state = {"device_states": {"L1-01": "OFF"}, "alert_keys": [], "risk_level": "LOW"}
     new_state = build_state_snapshot(schema, analysis)
     msg = build_change_message(schema, analysis, old_state, new_state)
+    assert msg is None
+
+
+def test_build_change_message_detects_alerts():
+    """Сообщение формируется только при появлении или устранении аварий/предупреждений."""
+    schema = {"devices": [{"id": "L1-01", "name": "Котёл", "phase": "L1", "state": "ON",
+                            "category": "heating", "rated_current_a": 16, "current_a": 0.0,
+                            "power_w": 0.0, "temperature_c": 30, "voltage_v": 210.0}]}
+    analysis = PhaseAnalyzer.evaluate(schema)
+    old_state = {"device_states": {"L1-01": "ON"}, "alert_keys": [], "risk_level": "LOW"}
+    new_state = {"device_states": {"L1-01": "ON"}, "alert_keys": ["WARNING|Котёл|Просадка напряжения на линии: 175.0В"], "risk_level": "LOW"}
+    msg = build_change_message(schema, analysis, old_state, new_state)
     assert msg is not None
-    assert "Котёл" in msg
-    assert "OFF" in msg and "ON" in msg
+    assert "НОВЫЙ АЛЕРТ [Котёл]" in msg
 
 
 def test_build_change_message_no_change_returns_none():
@@ -97,6 +109,7 @@ if __name__ == "__main__":
     test_apply_dps_to_device_no_known_codes()
     test_phase_analyzer_evaluate_detects_imbalance()
     test_build_state_snapshot()
-    test_build_change_message_detects_breaker_toggle()
+    test_build_change_message_ignores_breaker_toggle()
+    test_build_change_message_detects_alerts()
     test_build_change_message_no_change_returns_none()
     print("OK: все проверки tuya_monitor.py прошли")
